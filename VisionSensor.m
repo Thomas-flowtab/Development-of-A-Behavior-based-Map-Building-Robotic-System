@@ -22,7 +22,7 @@ classdef VisionSensor
             end
             
             % Capture the image from the vision sensor
-            [returnCode, resolution, image] = sim.simxGetVisionSensorImage2(clientID, obj.handle, 0, operationMode);
+            [returnCode, ~, image] = sim.simxGetVisionSensorImage2(clientID, obj.handle, 0, operationMode);
             
             if returnCode ~= sim.simx_return_ok
                 disp('Failed to capture image.');
