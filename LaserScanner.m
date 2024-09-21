@@ -37,7 +37,7 @@ classdef LaserScanner
             
             % Assume the laser data is in polar coordinates, convert to Cartesian
             numDataPoints = length(laserData);
-            angles = linspace(-135, 135, numDataPoints); %  270-degree field of view
+            angles = linspace(-180, 180, numDataPoints); %  360-degree field of view
             processedData = zeros(numDataPoints, 2);    % Store (x, y) positions
 
             for i = 1:numDataPoints
