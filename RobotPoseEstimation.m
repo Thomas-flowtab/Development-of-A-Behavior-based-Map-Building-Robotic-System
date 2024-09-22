@@ -27,7 +27,7 @@ classdef RobotPoseEstimation
                 % Unwrap the theta to maintain continuity over multiple turns
                 theta = atan2(sin(theta), cos(theta));  % This ensures theta is between -pi and pi
         
-                % Smoothing out rapid fluctuations (optional step)
+                % Smoothing out rapid fluctuations 
                 smoothFactor = 0.9;
                 theta = smoothFactor * obj.lastTheta + (1 - smoothFactor) * theta;
         
