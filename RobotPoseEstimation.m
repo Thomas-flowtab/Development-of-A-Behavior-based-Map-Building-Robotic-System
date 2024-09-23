@@ -4,14 +4,16 @@ classdef RobotPoseEstimation
         clientID
         baseHandle  % Handle to the robot's base in CoppeliaSim
         lastTheta = 0; % Store the last known theta to ensure continuity
+        loggedPoses % Property to store the robot's poses
     end
     
     methods
         % Constructor
-        function obj = RobotPoseEstimation(sim, clientID, baseHandle)
-            obj.sim = sim;
-            obj.clientID = clientID;
+        function obj = RobotPoseEstimation(connection, baseHandle)
+            obj.sim = connection.sim;
+            obj.clientID = connection.clientID;
             obj.baseHandle = baseHandle;
+            obj.loggedPoses = []; 
         end
         
         function pose = getPose(obj)
@@ -41,7 +43,13 @@ classdef RobotPoseEstimation
                 pose = [];  % Return empty if retrieval fails
                 disp('Failed to retrieve robot pose.');
             end
+            % Log the current pose
+            obj.loggedPoses = [obj.loggedPoses; pose];
         end
 
+        function poses = getLoggedPoses(obj)
+            % This method returns the logged robot poses
+            poses = obj.loggedPoses;
+        end
     end
 end
