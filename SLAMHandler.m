@@ -19,55 +19,67 @@ classdef SLAMHandler
         end
         
         function updateSLAM(obj, connection)
-            % Retrieve laser data and robot pose
-            try
-                [res, data] = connection.sim.simxGetStringSignal(connection.clientID, 'laserData', connection.sim.simx_opmode_buffer);
-                
-                if res == connection.sim.simx_return_ok
-                    % Decode and process the laser data
-                    obj.LaserData = obj.decode(data);
-                    
-                    % Process the laser data and create a lidarScan object
-                    reshapedData = reshape(obj.LaserData, 4, [])';
-                    x = reshapedData(:, 1);
-                    y = reshapedData(:, 2);
-                    theta = reshapedData(:, 4);
-                    validThetaRange = [-pi, pi];
-                    validThetaIndices = (theta >= validThetaRange(1)) & (theta <= validThetaRange(2));
-                    theta = theta(validThetaIndices);
-                    x = x(validThetaIndices);
-                    y = y(validThetaIndices);
-                    r = sqrt(x.^2 + y.^2);
-                    minRange = 0.1;
-                    maxRange = 8;
-                    validIndices = (r > minRange) & (r < maxRange);
-                    r(~validIndices) = NaN;
-                    validCartesianIndices = ~isnan(r);
-                    x_cartesian = r(validCartesianIndices) .* cos(theta(validCartesianIndices));
-                    y_cartesian = r(validCartesianIndices) .* sin(theta(validCartesianIndices));
-                    cartesianData = [x_cartesian, y_cartesian];
-                    lidarScanObject = lidarScan(cartesianData);
-                    currentPose = obj.robotPose.getPose();
-                    addScan(obj.slamAlg, lidarScanObject, currentPose);
-                    
-                    % Plot SLAM map on MapTrajectory UIAxes
-                    axes(obj.MapTrajectory); % Set MapTrajectory as the current axes
-                    cla(obj.MapTrajectory);  % Clear previous content
-                    show(obj.slamAlg, 'Parent', obj.MapTrajectory); % Plot SLAM map
-                    title(obj.MapTrajectory, 'SLAM Map and Trajectory');
-                    drawnow;
+    try
+        % Retrieve the packed laser data signal
+        [res, data] = connection.sim.simxGetStringSignal(connection.clientID, 'laserData', connection.sim.simx_opmode_buffer);
 
-                    % Optionally, update occupancy map every 1000 scans
-                    if mod(length(obj.robotPose.getLoggedPoses()), 1000) == 0
-                        obj.buildOccupancyMap();  % Update occupancy map
-                    end
-                else
-                    disp('Failed to retrieve laser data.');
-                end
-            catch ME
-                disp(['SLAM update error: ', ME.message]);
+        if res == connection.sim.simx_return_ok
+            % Unpack the data from the float table
+            unpackedData = connection.sim.simxUnpackFloats(data);
+
+            % Check if unpackedData is valid
+            if isempty(unpackedData)
+                disp('Received empty data.');
+                return;
             end
+
+            % The data is structured as [range1, angle1, range2, angle2, ..., rangeN, angleN, x, y, beta]
+            numRanges = (length(unpackedData) - 3) / 2;  % Minus 3 for x, y, beta
+            ranges = unpackedData(1:2:(2*numRanges-1));  % Extract ranges
+            angles = unpackedData(2:2:(2*numRanges));    % Extract angles
+
+            % Extract the robot pose (x, y, beta)
+            robotX = unpackedData(end-2);
+            robotY = unpackedData(end-1);
+            robotBeta = unpackedData(end);
+            disp(robotBeta)
+
+            % Convert ranges and angles to Cartesian coordinates for SLAM
+            x_cartesian = ranges .* cos(angles);
+            y_cartesian = ranges .* sin(angles);
+            cartesianData = [x_cartesian', y_cartesian'];  % Transpose to match expected format
+
+
+            % Create a lidarScan object using Cartesian coordinates
+            lidarScanObject = lidarScan(cartesianData);
+
+            % Update the robot's current pose with the x, y, and beta (yaw)
+            currentPose = [robotX, robotY, robotBeta];
+            obj.robotPose.setPose(currentPose);  % Assuming robotPose is a class with setPose() method
+
+            % Add the scan to the SLAM algorithm
+            addScan(obj.slamAlg, lidarScanObject, currentPose);
+
+            % Plot SLAM map on MapTrajectory UIAxes
+            axes(obj.MapTrajectory); % Set MapTrajectory as the current axes
+            cla(obj.MapTrajectory);  % Clear previous content
+            show(obj.slamAlg, 'Parent', obj.MapTrajectory); % Plot SLAM map
+            title(obj.MapTrajectory, 'SLAM Map and Trajectory');
+            drawnow;
+
+            % Optionally, update occupancy map every 1000 scans
+            if mod(length(obj.robotPose.getLoggedPoses()), 1000) == 0
+                obj.buildOccupancyMap();  % Update occupancy map
+            end
+        else
+            disp('Failed to retrieve laser data.');
         end
+    catch ME
+        disp(['SLAM update error: ', ME.message]);
+    end
+end
+
+
         
         function buildOccupancyMap(obj)
             % Create the occupancy map from the SLAM data
@@ -83,12 +95,6 @@ classdef SLAMHandler
             hold(obj.MapOccupancy, 'off');
             title(obj.MapOccupancy, 'Occupancy Grid Map Built Using Lidar SLAM');
             drawnow;
-        end
-        
-        function laserData = decode(~, data)
-            % Decode the raw laser data from CoppeliaSim
-            rawBytes = uint8(data);
-            laserData = typecast(rawBytes, 'single');
         end
     end
 end
