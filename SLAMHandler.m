@@ -1,14 +1,18 @@
-classdef SLAMHandler
+classdef SLAMHandler < handle
     properties
         slamAlg         % SLAM algorithm object
         MapTrajectory   % UIAxes for displaying the SLAM map and trajectory
         MapOccupancy    % UIAxes for displaying the occupancy map
         LaserData       % Property to store laser scan data
         robotPose       % Robot pose estimation object
+        laserScanner    % Reference to LaserScanner object for retrieving laser data
+        slamTimer       % Timer for periodic update
+        isUpdating      % Flag to check if it's updating
+ 
     end
     
     methods
-        function obj = SLAMHandler(mapResolution, maxRange, loopClosureThreshold, loopClosureSearchRadius, robotPose, mapTrajectoryAxes, mapOccupancyAxes)
+        function obj = SLAMHandler(mapResolution, maxRange, loopClosureThreshold, loopClosureSearchRadius, robotPose, mapTrajectoryAxes, mapOccupancyAxes,laserScanner)
             % Constructor to initialize the SLAM algorithm and UIAxes
             obj.slamAlg = lidarSLAM(mapResolution, maxRange);
             obj.slamAlg.LoopClosureThreshold = loopClosureThreshold;
@@ -16,70 +20,64 @@ classdef SLAMHandler
             obj.robotPose = robotPose;
             obj.MapTrajectory = mapTrajectoryAxes; % Assign the UIAxes for SLAM map
             obj.MapOccupancy = mapOccupancyAxes;   % Assign the UIAxes for occupancy map
+            obj.laserScanner = laserScanner;
+            obj.slamTimer = timer('ExecutionMode', 'fixedRate', ...
+                                     'Period', 1, ...
+                                     'TimerFcn', @(~,~) obj.updateSLAM());
+            obj.isUpdating = false;
         end
         
-        function updateSLAM(obj, connection)
-    try
-        % Retrieve the packed laser data signal
-        [res, data] = connection.sim.simxGetStringSignal(connection.clientID, 'laserData', connection.sim.simx_opmode_buffer);
-
-        if res == connection.sim.simx_return_ok
-            % Unpack the data from the float table
-            unpackedData = connection.sim.simxUnpackFloats(data);
-
-            % Check if unpackedData is valid
-            if isempty(unpackedData)
-                disp('Received empty data.');
-                return;
+        function obj = startUpdating(obj)
+            % Start updating by starting the timer
+            if ~obj.isUpdating 
+                start(obj.slamTimer);
+                obj.isUpdating = true;
+                disp(obj.isUpdating);
             end
-
-            % The data is structured as [range1, angle1, range2, angle2, ..., rangeN, angleN, x, y, beta]
-            numRanges = (length(unpackedData) - 3) / 2;  % Minus 3 for x, y, beta
-            ranges = unpackedData(1:2:(2*numRanges-1));  % Extract ranges
-            angles = unpackedData(2:2:(2*numRanges));    % Extract angles
-
-            % Extract the robot pose (x, y, beta)
-            robotX = unpackedData(end-2);
-            robotY = unpackedData(end-1);
-            robotBeta = unpackedData(end);
-            disp(robotBeta)
-
-            % Convert ranges and angles to Cartesian coordinates for SLAM
-            x_cartesian = ranges .* cos(angles);
-            y_cartesian = ranges .* sin(angles);
-            cartesianData = [x_cartesian', y_cartesian'];  % Transpose to match expected format
-
-
-            % Create a lidarScan object using Cartesian coordinates
-            lidarScanObject = lidarScan(cartesianData);
-
-            % Update the robot's current pose with the x, y, and beta (yaw)
-            currentPose = [robotX, robotY, robotBeta];
-            obj.robotPose.setPose(currentPose);  % Assuming robotPose is a class with setPose() method
-
-            % Add the scan to the SLAM algorithm
-            addScan(obj.slamAlg, lidarScanObject, currentPose);
-
-            % Plot SLAM map on MapTrajectory UIAxes
-            axes(obj.MapTrajectory); % Set MapTrajectory as the current axes
-            cla(obj.MapTrajectory);  % Clear previous content
-            show(obj.slamAlg, 'Parent', obj.MapTrajectory); % Plot SLAM map
-            title(obj.MapTrajectory, 'SLAM Map and Trajectory');
-            drawnow;
-
-            % Optionally, update occupancy map every 1000 scans
-            if mod(length(obj.robotPose.getLoggedPoses()), 1000) == 0
-                obj.buildOccupancyMap();  % Update occupancy map
-            end
-        else
-            disp('Failed to retrieve laser data.');
         end
-    catch ME
-        disp(['SLAM update error: ', ME.message]);
-    end
-end
+        
+        function obj = stopUpdating(obj)
+            % Stop updating by stopping the timer
+            if obj.isUpdating 
+                stop(obj.slamTimer);
+                obj.isUpdating = false;
+                disp(obj.isUpdating);
+            end
+        end
 
+        function [lidarScanObject] = updateSLAM(obj)
 
+            try
+                % Retrieve the packed laser data signal
+                [cartesianData,currentPose] = obj.laserScanner.GetLaserDecodedData();
+                if ~isempty(cartesianData)
+                    
+                    % Create a lidarScan object using Cartesian coordinates
+                    lidarScanObject = lidarScan(cartesianData);
+                            
+                    obj.robotPose.setPose(currentPose);  % Assuming robotPose is a class with setPose() method
+        
+                    % Add the scan to the SLAM algorithm
+                    addScan(obj.slamAlg, lidarScanObject, currentPose);
+        
+                    % Plot SLAM map on MapTrajectory UIAxes
+                    axes(obj.MapTrajectory); % Set MapTrajectory as the current axes
+                    cla(obj.MapTrajectory);  % Clear previous content
+                    show(obj.slamAlg, 'Parent', obj.MapTrajectory); % Plot SLAM map
+                    title(obj.MapTrajectory, 'SLAM Map and Trajectory');
+                    drawnow;
+        
+                    % Optionally, update occupancy map every 1000 scans
+                    if mod(length(obj.robotPose.getLoggedPoses()), 1000) == 0
+                        obj.buildOccupancyMap();  % Update occupancy map
+                    end
+                else
+                    disp('Failed to retrieve laser data from the laser scanner.');
+                end
+            catch ME
+                disp(['SLAM update error: ', ME.message]);
+            end
+        end
         
         function buildOccupancyMap(obj)
             % Create the occupancy map from the SLAM data

@@ -1,16 +1,14 @@
 classdef LaserScanner < handle
     properties
-        laserHandle
         clientID
         sim
         isStreamingData
     end
 
     methods
-        function obj = LaserScanner(connection, laserHandle)
+        function obj = LaserScanner(connection)
             obj.sim = connection.sim;
             obj.clientID = connection.clientID;
-            obj.laserHandle = laserHandle;
             response = obj.sim.simxGetStringSignal(obj.clientID, 'laserData', obj.sim.simx_opmode_streaming);
             if response == obj.sim.simx_return_ok || response == obj.sim.simx_return_novalue_flag
                 obj.isStreamingData = true;
@@ -19,40 +17,42 @@ classdef LaserScanner < handle
             end
         end
 
-        function cartesianData = GetLaserDecodedData(obj)
+        function [cartesianData,currentPose] = GetLaserDecodedData(obj)
             try 
-            % Retrieve laser data
-            [res, data] = obj.sim.simxGetStringSignal(obj.clientID, 'laserData', obj.sim.simx_opmode_buffer);
-                        
-                if res == obj.sim.simx_return_ok
-                
-                    tempLaserData = obj.Decode(data);
-                    
+                cartesianData = [];
+                currentPose = [];
+                % Retrieve the packed laser data signal
+                [res, data] = obj.sim.simxGetStringSignal(obj.clientID, 'laserData', obj.sim.simx_opmode_buffer);
 
-                    % Reshape the data and restrict to valid theta ranges
-                    reshapedData = reshape(tempLaserData, 4, [])';
+                if res == obj.sim.simx_return_ok
+                    % Unpack the data from the float table
+                    unpackedData = obj.sim.simxUnpackFloats(data);
+
+                    % Check if unpackedData is valid
+                    if isempty(unpackedData)
+                        disp('Received empty data.');
+                        return;
+                    end
+
+                    % The data is structured as [range1, angle1, range2, angle2, ..., rangeN, angleN, x, y, beta]
+                    numRanges = (length(unpackedData) - 3) / 2;  % Minus 3 for x, y, beta
+                    ranges = unpackedData(1:2:(2*numRanges-1));  % Extract ranges
+                    angles = unpackedData(2:2:(2*numRanges));    % Extract angles
+
+                    % Extract the robot pose (x, y, beta)
+                    robotX = unpackedData(end-2);
+                    robotY = unpackedData(end-1);
+                    robotBeta = unpackedData(end);
                     
-                    x = reshapedData(:, 1);
-                    y = reshapedData(:, 2);
-                    theta = reshapedData(:, 4);
-                    validThetaRange = [-pi, pi];
-                    validThetaIndices = theta >= validThetaRange(1) & theta <= validThetaRange(2);
-                    theta = theta(validThetaIndices);
-                    x = x(validThetaIndices);
-                    y = y(validThetaIndices);
-                    r = sqrt(x.^2 + y.^2);
-                    minRange = 0.1;
-                    maxRange = 8;
-                    validIndices = r > minRange & r < maxRange;
-                    r(~validIndices) = NaN;
-                    validCartesianIndices = ~isnan(r);
-                    x_cartesian = r(validCartesianIndices) .* cos(theta(validCartesianIndices));
-                    y_cartesian = r(validCartesianIndices) .* sin(theta(validCartesianIndices));
-                    cartesianData = [x_cartesian, y_cartesian];
-                    disp('Laser data retrieved');
+                    currentPose = [robotX, robotY, robotBeta];
+
+                    % Convert ranges and angles to Cartesian coordinates for SLAM
+                    x_cartesian = ranges .* cos(angles);
+                    y_cartesian = ranges .* sin(angles);
+                    cartesianData = [x_cartesian', y_cartesian'];  % Transpose to match expected format
                 else
-                    cartesianData = [];
-                    disp('Failed to retrieve laser data.');
+                    
+                    disp('Failed to retrieve laser data from Coppelia.');
                 end
              catch ME
                 disp(['SLAM update error: ', ME.message]);
