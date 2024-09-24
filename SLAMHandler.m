@@ -43,7 +43,7 @@ classdef SLAMHandler < handle
             end
         end
 
-        function [lidarScanObject] = updateSLAM(obj)
+        function [lidarScanObject,currentPose] = updateSLAM(obj)
 
             try
                 % Retrieve the packed laser data signal
