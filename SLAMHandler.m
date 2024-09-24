@@ -32,7 +32,6 @@ classdef SLAMHandler < handle
             if ~obj.isUpdating 
                 start(obj.slamTimer);
                 obj.isUpdating = true;
-                disp(obj.isUpdating);
             end
         end
         
@@ -41,7 +40,6 @@ classdef SLAMHandler < handle
             if obj.isUpdating 
                 stop(obj.slamTimer);
                 obj.isUpdating = false;
-                disp(obj.isUpdating);
             end
         end
 
