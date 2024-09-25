@@ -13,10 +13,11 @@ classdef Explorer < handle
         lastLeftDistance      % Store previous left distance for gap detection
         lastRightDistance     % Store previous right distance for gap detection
         gapThreshold          % Threshold for detecting gaps (e.g., sudden increase in distance)
+        laserHandler          % Reference to LaserScanner object
     end
     
     methods
-        function obj = Explorer(slamHandler, baseControl, safeDistance, speed, connection, switchHandler, gapThreshold)
+        function obj = Explorer(slamHandler, baseControl, safeDistance, speed, connection, switchHandler, gapThreshold,laserHandler)
             % Constructor to initialize Explorer class
             obj.slamHandler = slamHandler;
             obj.movementControl = baseControl;
@@ -29,6 +30,7 @@ classdef Explorer < handle
             obj.lastLeftDistance = inf;   % Initialize to a large value
             obj.lastRightDistance = inf;  % Initialize to a large value
             obj.gapThreshold = gapThreshold;  % Set gap detection threshold
+            obj.laserHandler = laserHandler;
 
             % Initialize a timer for exploration
             obj.exploreTimer = timer('ExecutionMode', 'fixedRate', ...
@@ -59,13 +61,25 @@ classdef Explorer < handle
         function exploreStep(obj)
             if obj.isExploring
                 % A single step in the exploration process, executed periodically by the timer
-                scan = obj.slamHandler.updateSLAM();
-                
-                % Detect obstacles and decide movement based on front, left, and right
-                if obj.detectObstacle(scan)
-                    obj.avoidObstacle(scan);
+                [~, ~, zones] = obj.laserHandler.GetLaserDecodedData();
+
+                % Zones array: 1 (Front), 2 (Front-left), 3 (Left), 4 (Right), 5 (Front-right)
+                if ~zones(1)  % Front zone is not free (obstacle detected)
+                    % Stop the robot if the front is blocked
+                    obj.movementControl.stop(obj.connection.sim, obj.connection.clientID);
+
+                    % Turn based on the left or right zone availability
+                    if zones(4)  % Right zone is free
+                        obj.turn('clockwise');
+                    elseif zones(3)  % Left zone is free
+                        obj.turn('counter_clockwise');
+                    else
+                        % If both sides are blocked, reverse
+                        obj.movementControl.move(obj.connection.sim, obj.connection.clientID, obj.movementControl.WheelMovements.BACKWARD, obj.reverseSpeed);
+                    end
                 else
-                    obj.explore();
+                    % If the front zone is free, move forward
+                    obj.movementControl.move(obj.connection.sim, obj.connection.clientID, obj.movementControl.WheelMovements.FORWARD, obj.speed);
                 end
             end
         end

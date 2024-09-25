@@ -47,7 +47,7 @@ classdef SLAMHandler < handle
 
             try
                 % Retrieve the packed laser data signal
-                [cartesianData,currentPose] = obj.laserScanner.GetLaserDecodedData();
+                [cartesianData,currentPose,~] = obj.laserScanner.GetLaserDecodedData();
                 if ~isempty(cartesianData)
                     
                     % Create a lidarScan object using Cartesian coordinates
