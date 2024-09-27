@@ -1,113 +1,114 @@
 classdef LaserScanner < handle
+    % LaserScanner Class to interface with a laser scanner in a simulation environment.
+    %
+    % This class handles the connection to the laser scanner, streaming of laser data,
+    % extraction of robot pose, and conversion of laser scan data to Cartesian coordinates
+    % suitable for SLAM (Simultaneous Localization and Mapping).
+
     properties
-        clientID
-        sim
-        isStreamingData
-        zones %Array of struct for zones
+        clientID         % Identifier for the client connection to the simulation
+        sim              % Simulation interface object
+        isStreamingData  % Flag indicating if laser data streaming is active
+        robotPose        % Object representing the robot's pose (position and orientation)
     end
 
     methods
-        function obj = LaserScanner(connection)
+        function obj = LaserScanner(connection, robotPose)
+            % Constructor for the LaserScanner class.
+            %
+            % Initializes the connection to the simulation, sets up data streaming,
+            % and retrieves the initial robot position.
+            %
+            % Parameters:
+            %   connection - Struct containing simulation connection details
+            %   robotPose  - Object to store and update the robot's pose
+
             obj.sim = connection.sim;
             obj.clientID = connection.clientID;
-            response = obj.sim.simxGetStringSignal(obj.clientID, 'laserData', obj.sim.simx_opmode_streaming);
-            if response == obj.sim.simx_return_ok || response == obj.sim.simx_return_novalue_flag
+            obj.robotPose = robotPose;
+            
+            % Attempt to start streaming laser data from the simulation
+            [returnCode, ~] = connection.sim.simxGetStringSignal(connection.clientID, ...
+                'laserData', connection.sim.simx_opmode_streaming);
+            
+            % Check if streaming was successfully initialized
+            if returnCode == connection.sim.simx_return_ok || ...
+               returnCode == connection.sim.simx_return_novalue_flag
                 obj.isStreamingData = true;
+                disp('Laser data streaming initialized successfully.');
             else
                 obj.isStreamingData = false;
+                disp('Failed to initialize laser data streaming.');
             end
-
-            % Initialize 5 zones with minAngle, maxAngle, and threshold
-            obj.zones = struct('minAngle', {}, 'maxAngle', {}, 'threshold', {}, 'isFree', {});
-            % Define each zone with its angular range and threshold distance
-            %Zone1 = front of robot min = 30° and max = 150°
-            %Zone2 = front-left of robot min = 150° and max = 180°
-            %Zone3 = left of robot min = -180° and max = -130°
-            %Zone4 = right of robot min = -50° and max = 0°
-            %Zone5 = front-right of robot min = 0° and max = 30°
-            obj.zones(1) = struct('minAngle', deg2rad(30), 'maxAngle', deg2rad(150), 'threshold', 0.3, 'isFree', true);
-            obj.zones(2) = struct('minAngle', deg2rad(150), 'maxAngle', deg2rad(180), 'threshold', 0.3, 'isFree', true);
-            obj.zones(3) = struct('minAngle', deg2rad(-180), 'maxAngle', deg2rad(-130), 'threshold', 0.3, 'isFree', true);
-            obj.zones(4) = struct('minAngle', deg2rad(-50), 'maxAngle', deg2rad(0), 'threshold', 0.3, 'isFree', true);
-            obj.zones(5) = struct('minAngle', deg2rad(0), 'maxAngle', deg2rad(30), 'threshold', 0.3, 'isFree', true);
-
-
         end
 
-        function [cartesianData,currentPose,zones] = GetLaserDecodedData(obj)
+        function [cartesianData, currentPose] = getScannerData(obj)
+            % Retrieves the latest laser scan data and the current robot pose.
+            %
+            % Returns:
+            %   cartesianData - Nx2 matrix of (x, y) points in Cartesian coordinates
+            %   currentPose   - 1x3 vector representing the robot's current pose [x, y, beta]
+
             try 
                 cartesianData = [];
                 currentPose = [];
-                % Retrieve the packed laser data signal
-                [res, data] = obj.sim.simxGetStringSignal(obj.clientID, 'laserData', obj.sim.simx_opmode_buffer);
-
+                
+                % Retrieve the latest packed laser data signal from the simulation buffer
+                [res, data] = obj.sim.simxGetStringSignal(obj.clientID, ...
+                    'laserData', obj.sim.simx_opmode_buffer);
+                
                 if res == obj.sim.simx_return_ok
                     % Unpack the data from the float table
                     unpackedData = obj.sim.simxUnpackFloats(data);
-
-                    % Check if unpackedData is valid
+                    
+                    % Validate the unpacked data
                     if isempty(unpackedData)
-                        disp('Received empty data.');
+                        disp('Received empty laser data.');
                         return;
                     end
-
-                    % The data is structured as [range1, angle1, range2, angle2, ..., rangeN, angleN, x, y, beta]
-                    numRanges = (length(unpackedData) - 3) / 2;  % Minus 3 for x, y, beta
-                    ranges = unpackedData(1:2:(2*numRanges-1));  % Extract ranges
-                    angles = unpackedData(2:2:(2*numRanges));    % Extract angles
-                    % Extract the robot pose (x, y, beta)
-                    robotX = unpackedData(end-2);
-                    robotY = unpackedData(end-1);
-                    robotBeta = unpackedData(end);
                     
+                    % The data structure:
+                    % [range1, angle1, range2, angle2, ..., rangeN, angleN, x, y, beta]
+                    numRanges = (length(unpackedData) - 3) / 2;  % Subtract 3 for robot pose
+                    
+                    % Extract ranges and angles using vectorized indexing
+                    ranges = unpackedData(1:2:(2*numRanges-1));  % Range values
+                    angles = unpackedData(2:2:(2*numRanges));    % Angle values
+                    
+                    % Extract the robot's current pose
+                    [robotX, robotY, robotBeta] = obj.extractRobotPosition(unpackedData);
                     currentPose = [robotX, robotY, robotBeta];
-
-                    % Convert ranges and angles to Cartesian coordinates for SLAM
+                    
+                    % Convert polar coordinates (range, angle) to Cartesian coordinates (x, y)
                     x_cartesian = ranges .* cos(angles);
                     y_cartesian = ranges .* sin(angles);
-                    cartesianData = [x_cartesian', y_cartesian'];  % Transpose to match expected format
-
-                    % First, assume all zones are free (initialize isFree to true)
-                    zones = zeros(1,length(obj.zones)); %array to return 
-                    for j = 1:length(obj.zones)
-                        obj.zones(j).isFree = true;  % Start by assuming the zone is free
-                        zones(j) = true;
-                    end
                     
-                    % Check each point's angle to determine which zone it falls into
-                    for i = 1:numRanges
-                        angle = angles(i);
-                        distance = ranges(i);
-                        % Check each zone
-                        for j = 1:length(obj.zones)
-                            if angle >= obj.zones(j).minAngle && angle <= obj.zones(j).maxAngle
-                                if distance <= obj.zones(j).threshold
-                                    obj.zones(j).isFree = false;  % Mark the zone as not free if within threshold
-                                    zones(j) = false;
-                                end
-                            end
-                        end
-                    end
+                    % Combine x and y coordinates into an Nx2 matrix
+                    cartesianData = [x_cartesian', y_cartesian'];
                 else
-                    
-                    disp('Failed to retrieve laser data from Coppelia.');
+                    disp('Failed to retrieve laser data from the simulation.');
                 end
-             catch ME
+            catch ME
+                % Handle any errors that occur during data retrieval or processing
                 disp(['SLAM update error: ', ME.message]);
             end
         end
 
-         % Method to decode laser data
-        function laserData = Decode(~, data)
-            % Convert the raw string data from CoppeliaSim into usable laser distance data.
-            % Assuming data is a char array (string data from CoppeliaSim)
-        
-            % Convert the string to uint8 (bytes)
-            rawBytes = uint8(data);
-            
-            % Typecast the bytes to single precision floats
-            laserData = typecast(rawBytes, 'single');
-            disp('Data was decoded.');
+        function [robotX, robotY, robotBeta] = extractRobotPosition(~, unpackedData)
+            % Extracts the robot's pose from the unpacked laser data.
+            %
+            % Parameters:
+            %   unpackedData - Array of floats containing laser data and robot pose
+            %
+            % Returns:
+            %   robotX   - X-coordinate of the robot
+            %   robotY   - Y-coordinate of the robot
+            %   robotBeta - Orientation (angle) of the robot
+
+            % The last three elements of unpackedData represent the robot's pose
+            robotX = unpackedData(end-2);
+            robotY = unpackedData(end-1);
+            robotBeta = unpackedData(end);
         end
     end
 end
