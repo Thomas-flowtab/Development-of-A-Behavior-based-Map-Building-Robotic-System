@@ -23,12 +23,14 @@ classdef Explorer < handle
             obj.slamHandler = slamHandler;  % Instance of SLAMHandler class for map updates
             obj.sensor = sensor;            % Hokuyo LaserScanner class instance
             obj.robotPose = robotPose; 
+
             % Initialize the Pure Pursuit controller
             obj.controller = controllerPurePursuit;
             obj.controller.LookaheadDistance = 0.5;  % Adjust this value as needed
             obj.controller.DesiredLinearVelocity = 0.3;  % Adjust for desired speed
             obj.controller.MaxAngularVelocity = 1.0;  % Maximum rotation speed
             obj.MapOccupancy = mapOccupancy;
+
             % Initialize exploration flag
             obj.isExploring = false;
             
@@ -152,34 +154,21 @@ classdef Explorer < handle
 
         
        function followPathToFrontier(obj)
-            % Plan a path to the closest frontier and move the robot along it
-            obj.getRobotPose();
-            currentPose = [round(obj.robotPosition(1)),round(obj.robotPosition(2))];
-            
             disp(obj.largestFrontier);
+            disp('here we go');
 
-            obj.goalPosition = obj.selectClosestFrontierPoint(obj.largestFrontier, currentPose);
-
+            obj.goalPosition = [obj.largestFrontier(1),obj.largestFrontier(2)];
+            disp(obj.goalPosition);
 
             if isempty(obj.goalPosition)
                 disp('No goal position available');
                 return;
             end
-        
             
-            startPose = [round(obj.robotPosition(1)),round(obj.robotPosition(2))];  % Current robot position
-            goalPose = [obj.goalPosition(1),obj.goalPosition(2)];    % Goal frontier position
-            
-            startGrid = startPose(1:2);  % Convert to integer grid indices
-            goalGrid = round(goalPose);         % Convert to integer grid indices
-        
-            disp('Start Grid:');
-            disp(startGrid);
-            disp('Goal Grid:');
-            disp(goalGrid);
+            currentRobotPosition = obj.robotPose.getPose();
             
             % Perform path planning using the initialized planner
-            path = plan(obj.planner, startGrid, goalGrid,'world');
+            path = plan(obj.planner, [currentRobotPosition(1),currentRobotPosition(2)], obj.goalPosition,'world');
             
             disp('path');
 
@@ -190,10 +179,8 @@ classdef Explorer < handle
                 disp('Path could not be found.');
                 return;
             end
-            
-            disp('Path found:');
-            
-        
+            show(obj.planner);
+
             % Follow the path using Pure Pursuit
             obj.followPathWithPurePursuit(path);
         end
@@ -205,8 +192,7 @@ classdef Explorer < handle
             disp('following path now:');
 
             obj.controller.Waypoints = path;
-            
-            
+                        
             
             % Continuously move the robot along the path
             while ~isempty(path) && obj.isExploring
