@@ -76,7 +76,7 @@ classdef SLAMHandler < handle
             end
         end
 
-        function occupancyMap = updateSLAM(obj)
+        function map = updateSLAM(obj)
             % updateSLAM Retrieves new laser data, updates SLAM, and updates maps.
             %
             % This method is called periodically by the slamTimer. It retrieves the latest
@@ -105,8 +105,7 @@ classdef SLAMHandler < handle
                     
                     % Update occupancy map
                     map = obj.updateOccupancyMap();  
-                    occupancyMap = getOccupancy(map);
-                    
+                                        
                     % Update occupancy map based loggs
                 else
                     disp('Failed to retrieve laser data or current pose from the laser scanner.');
@@ -114,22 +113,23 @@ classdef SLAMHandler < handle
             
         end
        
-        function map = updateOccupancyMap(obj)
+        function occMap = updateOccupancyMap(obj)
 
             % Create the occupancy map from the SLAM data
             [scans, optimizedPoses] = scansAndPoses(obj.lidarSlam);
-            map = buildMap(scans, optimizedPoses,  40, 15);
-            
+            map = buildMap(scans, optimizedPoses,obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
+            occMap = occupancyMap(map, obj.lidarSlam.MapResolution);
+
+
             % Plot the occupancy map on MapOccupancy UIAxes
             axes(obj.mapOccupancyAxes); % Set MapOccupancy as the current axes
             cla(obj.mapOccupancyAxes);  % Clear previous content
             show(map, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
             hold(obj.mapOccupancyAxes, 'on');
-             % Plot the robot's current position
-            currentPose = obj.robotPose.getPose();
 
-            if ~isempty(currentPose)
-                plot(obj.mapOccupancyAxes, currentPose(1), currentPose(2), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
+            % Plot the robot's current position
+            if ~isempty(optimizedPoses)
+                plot(obj.mapOccupancyAxes, optimizedPoses(1), optimizedPoses(2), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
             end
             % show(obj.lidarSlam.PoseGraph, 'IDs', 'off', 'Parent', obj.mapOccupancyAxes); % Show the PoseGraph on the same axes
             

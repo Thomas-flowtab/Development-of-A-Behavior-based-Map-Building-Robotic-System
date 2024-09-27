@@ -40,9 +40,9 @@ classdef RobotPose < handle
             %
             % Returns:
             %   pose - 1x3 vector representing the current pose [x, y, beta]
-            [matlabX, matlabY, matlabTheta]  = obj.transformPose(obj.pose);
-            pose = [matlabX, matlabY, matlabTheta];
-            % pose = obj.pose;
+            % [matlabX, matlabY, matlabTheta]  = obj.transformPose(obj.pose);
+            % pose = [matlabX, matlabY, matlabTheta];
+            pose = obj.pose;
         end
         
         function poses = getLoggedPoses(obj)

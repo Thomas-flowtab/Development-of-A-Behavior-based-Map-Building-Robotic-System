@@ -39,22 +39,9 @@ classdef Explorer < handle
                                          'BusyMode', 'queue');
         end
         
-        function updateMap(obj)
-            % Update the map using SLAMHandler
-            obj.slamHandler.updateSLAM();
-        end
         
-        function detectAndSetFrontiers(obj)
-            % Detect frontiers and set the list of frontiers
-            occMap = obj.slamHandler.buildOccupancyMap();
-            disp('Occupancy map');
-            disp(occMap);
-            
-            obj.largestFrontier = obj.findLargestFrontier(occMap);  % Call the detectFrontiers method from the object
-            
-        end
-        
-     function goal = selectClosestFrontierPoint(~,frontierPoints, currentPose)
+              
+        function goal = selectClosestFrontierPoint(~,frontierPoints, currentPose)
             % Function to select the closest frontier point as the goal
             %
             % Inputs:
@@ -83,7 +70,7 @@ classdef Explorer < handle
         end
 
 
-        function largestFrontier = findLargestFrontier(~,map)
+        function largestFrontier = findLargestFrontier(~,occMap)
             % Function to find the largest frontier on an occupancy map
             %
             % Inputs:
@@ -93,11 +80,11 @@ classdef Explorer < handle
             %   largestFrontier - Nx2 array of [X, Y] coordinates representing the largest frontier
         
             % Define thresholds for free, occupied, and unknown cells
-            freeThreshold = map.FreeThreshold;          % Default is 0.2
-            occupiedThreshold = map.OccupiedThreshold;  % Default is 0.65
+            freeThreshold = occMap.FreeThreshold;          % Default is 0.2
+            occupiedThreshold = occMap.OccupiedThreshold;  % Default is 0.65
         
             % Get the occupancy matrix from the map
-            occMatrix = getOccupancy(map);
+            occMatrix = getOccupancy(occMap);
             
             % Classify cells based on occupancy probabilities
             freeCells = occMatrix < freeThreshold;
@@ -144,15 +131,15 @@ classdef Explorer < handle
             [frontierRows, frontierCols] = find(largestFrontierMask);
             
             % Convert grid indices to world coordinates
-            if ismethod(map, 'grid2world')
+            if ismethod(occMap, 'grid2world')
                 % Method 1: Use grid2world if available
-                frontierWorld = map.grid2world([frontierCols, frontierRows]);
+                frontierWorld = occMap.grid2world([frontierCols, frontierRows]);
                 frontierX = frontierWorld(:,1);
                 frontierY = frontierWorld(:,2);
             else
                 % Method 2: Manual conversion using map properties
-                resolution = map.GridResolution;          % meters per cell
-                origin = map.GridOriginInWorld;           % [x_origin, y_origin]
+                resolution = occMap.GridResolution;          % meters per cell
+                origin = occMap.GridOriginInWorld;           % [x_origin, y_origin]
                 
                 frontierX = (frontierCols - 1) * resolution + origin(1);
                 frontierY = (frontierRows - 1) * resolution + origin(2);
@@ -192,26 +179,11 @@ classdef Explorer < handle
             disp(goalGrid);
             
             % Perform path planning using the initialized planner
-            path = plan(obj.planner, startGrid, goalGrid);
+            path = plan(obj.planner, startGrid, goalGrid,'world');
             
             disp('path');
 
-            map = obj.slamHandler.getOccupancyMap();
-
-            show(map); % Plot occupancy map
-            hold on
-                if ~isempty(path)
-                    plot(startGrid(1),startGrid(2),"rx")
-                    plot(goalGrid(1),goalGrid(2),"go")
-                    plot(path(:, 1), path(:, 2), 'r-', 'LineWidth', 2); % Red line connecting the points
-                end
-            hold off
-            
-            
             disp(path);
-            hold off
-
-
             
             % Check if the path is valid
             if isempty(path)
@@ -270,9 +242,11 @@ classdef Explorer < handle
         function exploreAsync(obj)
             % Asynchronous exploration loop, triggered by the timer
             if obj.isExploring
-                obj.updateMap();             % Update the map
-                pause(1); % Give it time for the occupancy map to update
-                obj.detectAndSetFrontiers(); % Detect and set frontiers
+                occMap = obj.slamHandler.updateSLAM();
+                % Initialize the path planner based on user input
+                obj.planner = plannerAStarGrid(occMap);
+                % Detect frontiers and set the list of frontiers
+                obj.largestFrontier = obj.findLargestFrontier(occMap);
                 
                 if isempty(obj.largestFrontier)
                     disp('Exploration complete. No more frontiers found.');
@@ -286,14 +260,6 @@ classdef Explorer < handle
         end
         
         function getRobotPose(obj)
-            % Get the current robot position and orientation
-            % disp('Get the current robot position and orientation');
-
-            % Convert world coordinates to grid coordinates
-            % robotCurrentPosition = obj.robotPose.getPose();
-            % [x,y] = obj.ConvertCoordinates(robotCurrentPosition(1),robotCurrentPosition(2));
-            % obj.robotPosition = [x,y,robotCurrentPosition(3)];
-            
             obj.robotPosition = obj.robotPose.getPose();
         end
         
@@ -306,12 +272,7 @@ classdef Explorer < handle
             % Start the asynchronous exploration process using the timer
             if ~obj.isExploring
                 obj.isExploring = true;
-                
-                map = obj.slamHandler.getOccupancyMap();
 
-                % Initialize the path planner based on user input
-                obj.planner = plannerAStarGrid(map);
-             
 
                 start(obj.explorationTimer);
                 disp('Exploration started asynchronously');
@@ -326,47 +287,5 @@ classdef Explorer < handle
                 disp('Exploration stopped');
             end
         end
-
-
-      
-        function [x_grid, y_grid] = ConvertCoordinates(~, x_world, y_world)
-            % worldToGrid - Converts CoppeliaSim world coordinates to occupancy map grid coordinates
-            %
-            % Syntax: [x_grid, y_grid] = worldToGrid(x_world, y_world, resolution, gridOrigin, mapSize)
-            %
-            % Inputs:
-            %   x_world   - World X coordinate from CoppeliaSim (in meters)
-            %   y_world   - World Y coordinate from CoppeliaSim (in meters)
-            %   resolution - The resolution of the occupancy grid (size of each grid cell in meters)
-            %   gridOrigin - [x_origin, y_origin], the world coordinate origin in CoppeliaSim (e.g., [-20, -20])
-            %   mapSize    - Size of the grid (e.g., [400, 400] for a 400x400 grid)
-            %
-            % Outputs:
-            %   x_grid    - The corresponding X grid index in the occupancy map
-            %   y_grid    - The corresponding Y grid index in the occupancy map
-            
-            % Define parameters for the world-to-grid mapping
-            resolution = 20;     % Each grid cell represents 
-            gridOrigin = [-10, -10];  % CoppeliaSim world coordinates origin (in meters)
-            mapSize = [420,420];  % Size of the occupancy map (10x5 grid cells)
-            
-            % Example CoppeliaSim world coordinates (in meters)
-            % x_world = 2.5;  % X coordinate in CoppeliaSim world
-            % y_world = -1.5; % Y coordinate in CoppeliaSim world
-
-            % Convert world coordinates to grid indices using resolution and grid origin
-            
-            x_grid = round((x_world - gridOrigin(1)) / resolution);
-            y_grid = round((y_world - gridOrigin(2)) / resolution);
-            
-            % Clamp the grid coordinates to ensure they are within the valid map size
-            x_grid = max(1, min(mapSize(1), x_grid));  % Clamp x_grid between 1 and mapSize(1)
-            y_grid = max(1, min(mapSize(2), y_grid));  % Clamp y_grid between 1 and mapSize(2)
-            
-            % Display the result for debugging
-            fprintf('World coordinates (%.2f, %.2f) map to grid coordinates (%d, %d)\n', x_world, y_world, x_grid, y_grid);
-        end
-
-
     end
 end
