@@ -228,7 +228,9 @@ classdef Explorer < handle
         function exploreAsync(obj)
             % Asynchronous exploration loop, triggered by the timer
             if obj.isExploring
-                occMap = obj.slamHandler.updateSLAM();
+                occMap = obj.slamHandler.occupancyMap;
+                inflateRadious = 0.1;
+                inflate(occMap,inflateRadious);
                 % Initialize the path planner based on user input
                 obj.planner = plannerAStarGrid(occMap);
                 % Detect frontiers and set the list of frontiers

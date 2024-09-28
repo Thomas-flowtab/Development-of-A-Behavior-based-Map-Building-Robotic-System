@@ -24,6 +24,7 @@ classdef SLAMHandler < handle
         laserScanner      % Reference to LaserScanner object for retrieving laser data
         slamTimer         % Timer for periodic update
         isUpdating        % Flag to check if it's updating
+        occupancyMap      % Property to store the occupancy map
     end
     
     methods
@@ -51,6 +52,7 @@ classdef SLAMHandler < handle
             obj.mapTrajectoryAxes = mapTrajectoryAxes; % Assign the UIAxes for SLAM map
             obj.mapOccupancyAxes = mapOccupancyAxes;   % Assign the UIAxes for occupancy map
             obj.laserScanner = laserScanner;
+             obj.occupancyMap = occupancyMap(10, 10, mapResolution);  % Example dimensions; adjust as needed
             
             
             % Initialize timer for periodic updates
@@ -113,26 +115,25 @@ classdef SLAMHandler < handle
             
         end
        
-        function occMap = updateOccupancyMap(obj)
-
+        function obj = updateOccupancyMap(obj)
             % Create the occupancy map from the SLAM data
             [scans, optimizedPoses] = scansAndPoses(obj.lidarSlam);
-            map = buildMap(scans, optimizedPoses,obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
-            occMap = occupancyMap(map, obj.lidarSlam.MapResolution);
+            map = buildMap(scans, optimizedPoses, obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
 
+            % Store the updated occupancy map
+            obj.occupancyMap = occupancyMap(map, obj.lidarSlam.MapResolution);
 
             % Plot the occupancy map on MapOccupancy UIAxes
             axes(obj.mapOccupancyAxes); % Set MapOccupancy as the current axes
             cla(obj.mapOccupancyAxes);  % Clear previous content
-            show(map, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
+            show(obj.occupancyMap, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
             hold(obj.mapOccupancyAxes, 'on');
 
             % Plot the robot's current position
             if ~isempty(optimizedPoses)
                 plot(obj.mapOccupancyAxes, optimizedPoses(1), optimizedPoses(2), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
             end
-            % show(obj.lidarSlam.PoseGraph, 'IDs', 'off', 'Parent', obj.mapOccupancyAxes); % Show the PoseGraph on the same axes
-            
+
             hold(obj.mapOccupancyAxes, 'off');
             title(obj.mapOccupancyAxes, 'Occupancy Grid Map Built Using Lidar SLAM');
             drawnow;
