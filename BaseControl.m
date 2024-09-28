@@ -31,7 +31,7 @@ classdef BaseControl
             % omega: Angular velocity (from Pure Pursuit)
             
             % Decompose linear velocity into vx (forward/backward) and vy (side-to-side)
-            vx = v*10;  % Assume forward motion in x-direction (Pure Pursuit gives this as 'v')
+            vx = v;  % Assume forward motion in x-direction (Pure Pursuit gives this as 'v')
             vy = 0;  % No side motion; set vy to 0 for simplicity (you can extend this later)
             
             % Calculate the velocities for each wheel based on vx, vy, and omega

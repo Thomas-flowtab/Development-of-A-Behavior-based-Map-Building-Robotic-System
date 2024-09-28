@@ -38,36 +38,53 @@ classdef Explorer < handle
                                          'BusyMode', 'queue');
         end
         
-        
-              
-        function goal = selectClosestFrontierPoint(~,frontierPoints, currentPose)
-            % Function to select the closest frontier point as the goal
-            %
-            % Inputs:
-            %   frontierPoints - Nx2 array of [X, Y] coordinates
-            %   currentPose - 1x3 array [x, y, theta]
-            %
-            % Outputs:
-            %   goal - 1x2 array [X, Y] coordinates representing the goal position
-        
-            if isempty(frontierPoints)
-                error('Frontier points are empty. Cannot select a goal.');
+        function startExploration(obj)
+            % Start the asynchronous exploration process using the timer
+            if ~obj.isExploring
+                obj.isExploring = true;
+                start(obj.explorationTimer);
+                disp('Exploration started asynchronously');
             end
+        end
         
-            % Extract the robot's current position
-            robotX = currentPose(1);
-            robotY = currentPose(2);
-        
-            % Compute Euclidean distances from the robot to each frontier point
-            distances = sqrt((frontierPoints(:,1) - robotX).^2 + (frontierPoints(:,2) - robotY).^2);
-        
-            % Find the index of the minimum distance
-            [~, minIdx] = min(distances);
-        
-            % Select the closest frontier point as the goal
-            goal = frontierPoints(minIdx, :);
+        function stopExploration(obj)
+            % Stop the asynchronous exploration process by stopping the timer
+            if obj.isExploring
+                obj.isExploring = false;
+                stop(obj.explorationTimer);
+                disp('Exploration stopped');
+            end
         end
 
+        function exploreAsync(obj)
+            % Asynchronous exploration loop, triggered by the timer
+            if obj.isExploring
+                occMap = obj.slamHandler.occupancyMapObject;
+                
+                % Initialize the path planner based on user input
+
+                disp(occMap);
+                obj.planner = plannerAStarGrid(occMap);
+
+                % Detect frontiers and set the list of frontiers
+                obj.largestFrontier = obj.findLargestFrontier(occMap);
+                
+                if isempty(obj.largestFrontier)
+                    disp('Exploration complete. No more frontiers found.');
+                    obj.stopExploration();   % Stop exploration if no frontiers found
+                    return;
+                end
+                
+                % Move to the selected frontier
+                disp('Move to the selected frontier');
+                pathPlanning = obj.createPathPlanningToFrontier(); 
+
+                % Follow the path using Pure Pursuit
+                disp('Follow the path using Pure Pursuit');
+                obj.followPathWithPurePursuit(pathPlanning);
+
+            end
+        end
 
         function largestFrontier = findLargestFrontier(~,occMap)
             % Function to find the largest frontier on an occupancy map
@@ -147,63 +164,47 @@ classdef Explorer < handle
             % Combine X and Y coordinates into an Nx2 array
             largestFrontier = [frontierX, frontierY];
         end
+       
+        function adjustedPath = createPathPlanningToFrontier(obj)
 
-
-        
-       function followPathToFrontier(obj)
-            disp(obj.largestFrontier);
-            disp('here we go');
+            obj.getRobotPose();
 
             obj.goalPosition = [obj.largestFrontier(1),obj.largestFrontier(2)];
+            
             disp(obj.goalPosition);
 
             if isempty(obj.goalPosition)
                 disp('No goal position available');
                 return;
             end
-            
-            currentRobotPosition = obj.robotPose.getPose();
-            
+                        
             % Perform path planning using the initialized planner
-            path = plan(obj.planner, [currentRobotPosition(1),currentRobotPosition(2)], obj.goalPosition,'world');
+            path = plan(obj.planner, obj.robotPosition, obj.goalPosition,'world');
 
-   
             % Adjust the path by subtracting the initial position
-            adjustedPath = path - [currentRobotPosition(1),currentRobotPosition(2)];
-
-
-            disp('path');
-
-            disp(adjustedPath);
+            adjustedPath = path - obj.robotPosition;
             
             % Check if the path is valid
-            if isempty(path)
+            if isempty(adjustedPath)
                 disp('Path could not be found.');
                 return;
             end
-            
-
-            % Follow the path using Pure Pursuit
-            obj.followPathWithPurePursuit(adjustedPath);
         end
 
-
-        
         function followPathWithPurePursuit(obj, path)
             % Setup the Pure Pursuit controller waypoints from the planned path
             disp('following path now:');
 
             obj.controller.Waypoints = path;
-                        
             
             % Continuously move the robot along the path
             while ~isempty(path) && obj.isExploring
-                obj.getRobotPose();  % Update the robot position
                 
+                currentPose = obj.getRobotPose();  % Update the robot position
                 
                 % disp('Compute the control signals');
                 % Compute the control signals (linear velocity and angular velocity)
-                [v, omega] = obj.controller(obj.robotPosition);
+                [v, omega] = obj.controller(currentPose);
                 
 
                 % disp('Move the robot');
@@ -219,66 +220,16 @@ classdef Explorer < handle
                 obj.slamHandler.updateSLAM(path);
                 
                 % Check if the robot has reached the goal
-                if norm(obj.robotPosition(1:2) - path(end, :)) < obj.controller.LookaheadDistance
+                if norm(obj.robotPosition - path(end, :)) < obj.controller.LookaheadDistance
                     disp('Goal reached');
                     break;
                 end
             end
         end
-
         
-        function exploreAsync(obj)
-            % Asynchronous exploration loop, triggered by the timer
-            if obj.isExploring
-                occMap = obj.slamHandler.occupancyMapObject;
-                inflateRadious = 0.1;
-                inflate(occMap,inflateRadious);
-                % Initialize the path planner based on user input
-
-                disp(occMap);
-                obj.planner = plannerAStarGrid(occMap);
-
-                % Detect frontiers and set the list of frontiers
-                obj.largestFrontier = obj.findLargestFrontier(occMap);
-                
-                if isempty(obj.largestFrontier)
-                    disp('Exploration complete. No more frontiers found.');
-                    obj.stopExploration();   % Stop exploration if no frontiers found
-                    return;
-                end
-                
-                disp('Move to the selected frontier ');
-                obj.followPathToFrontier();  % Move to the selected frontier
-            end
-        end
-        
-        function getRobotPose(obj)
-            obj.robotPosition = obj.robotPose.getPose();
-        end
-        
-        function updateRobotPose(obj)
-            % Update the robot's position based on the movement
-             obj.robotPose.setPose(obj.robotPosition);
-        end
-        
-        function startExploration(obj)
-            % Start the asynchronous exploration process using the timer
-            if ~obj.isExploring
-                obj.isExploring = true;
-
-
-                start(obj.explorationTimer);
-                disp('Exploration started asynchronously');
-            end
-        end
-        
-        function stopExploration(obj)
-            % Stop the asynchronous exploration process by stopping the timer
-            if obj.isExploring
-                obj.isExploring = false;
-                stop(obj.explorationTimer);
-                disp('Exploration stopped');
-            end
+        function currentPose = getRobotPose(obj)
+            currentPose = obj.robotPose.getPose();
+            obj.robotPosition = [currentPose(1),currentPose(2)];
         end
     end
 end
