@@ -24,7 +24,7 @@ classdef SLAMHandler < handle
         laserScanner      % Reference to LaserScanner object for retrieving laser data
         slamTimer         % Timer for periodic update
         isUpdating        % Flag to check if it's updating
-        occupancyMap      % Property to store the occupancy map
+        occupancyMapObject      % Property to store the occupancy map
     end
     
     methods
@@ -52,13 +52,13 @@ classdef SLAMHandler < handle
             obj.mapTrajectoryAxes = mapTrajectoryAxes; % Assign the UIAxes for SLAM map
             obj.mapOccupancyAxes = mapOccupancyAxes;   % Assign the UIAxes for occupancy map
             obj.laserScanner = laserScanner;
-             obj.occupancyMap = occupancyMap(10, 10, mapResolution);  % Example dimensions; adjust as needed
+            obj.occupancyMapObject = occupancyMap(10, 10, mapResolution);  % Example dimensions; adjust as needed
             
             
             % Initialize timer for periodic updates
             obj.slamTimer = timer('ExecutionMode', 'fixedRate', ...
                                    'Period', 1, ... % Update every second; adjust as needed
-                                   'TimerFcn', @(~,~) obj.updateSLAM());
+                                   'TimerFcn', @(~,~) obj.updateSLAM([]));
             obj.isUpdating = false;
         end
         
@@ -78,7 +78,7 @@ classdef SLAMHandler < handle
             end
         end
 
-        function map = updateSLAM(obj)
+        function map = updateSLAM(obj,path)
             % updateSLAM Retrieves new laser data, updates SLAM, and updates maps.
             %
             % This method is called periodically by the slamTimer. It retrieves the latest
@@ -102,11 +102,11 @@ classdef SLAMHandler < handle
                     addScan(obj.lidarSlam, lidarScanObject, currentPose);
                     
                     % Update the trajectory map
-                    obj.updateTrajectoryMap();
+                    obj.updateTrajectoryMap(path);
 
                     
                     % Update occupancy map
-                    map = obj.updateOccupancyMap();  
+                    map = obj.updateOccupancyMap(path);  
                                         
                     % Update occupancy map based loggs
                 else
@@ -115,18 +115,18 @@ classdef SLAMHandler < handle
             
         end
        
-        function obj = updateOccupancyMap(obj)
+        function obj = updateOccupancyMap(obj,path)
             % Create the occupancy map from the SLAM data
             [scans, optimizedPoses] = scansAndPoses(obj.lidarSlam);
             map = buildMap(scans, optimizedPoses, obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
 
             % Store the updated occupancy map
-            obj.occupancyMap = occupancyMap(map, obj.lidarSlam.MapResolution);
+            obj.occupancyMapObject = occupancyMap(map, obj.lidarSlam.MapResolution);
 
             % Plot the occupancy map on MapOccupancy UIAxes
             axes(obj.mapOccupancyAxes); % Set MapOccupancy as the current axes
             cla(obj.mapOccupancyAxes);  % Clear previous content
-            show(obj.occupancyMap, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
+            show(obj.occupancyMapObject, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
             hold(obj.mapOccupancyAxes, 'on');
 
             % Plot the robot's current position
@@ -134,12 +134,17 @@ classdef SLAMHandler < handle
                 plot(obj.mapOccupancyAxes, optimizedPoses(1), optimizedPoses(2), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
             end
 
+            % Plot the path from plannerAStarGrid
+            if ~isempty(path)
+                plot(obj.mapOccupancyAxes, path(:, 1), path(:, 2), 'r-', 'LineWidth', 2);
+            end
+
             hold(obj.mapOccupancyAxes, 'off');
             title(obj.mapOccupancyAxes, 'Occupancy Grid Map Built Using Lidar SLAM');
             drawnow;
         end
 
-        function updateTrajectoryMap(obj)
+        function updateTrajectoryMap(obj,path)
             % updateTrajectoryMap Visualizes the SLAM trajectory on the MapTrajectory UIAxes.
             %
             % This method updates the trajectory visualization based on the current state
@@ -148,14 +153,26 @@ classdef SLAMHandler < handle
             % Set the current axes to MapTrajectory
             axes(obj.mapTrajectoryAxes);
             
-            % Clear previous plots
-            cla(obj.mapTrajectoryAxes);
+            % % Clear previous plots
+            % cla(obj.mapTrajectoryAxes);
             
             % Display the SLAM trajectory map
             show(obj.lidarSlam, 'Parent', obj.mapTrajectoryAxes);
+
+             % Hold on to overlay additional plots
+            hold(obj.mapTrajectoryAxes, 'on');
+
+             % Plot the path from plannerAStarGrid
+            if ~isempty(path)
+                plot(obj.mapTrajectoryAxes, path(:, 1), path(:, 2), 'r-', 'LineWidth', 2);
+            end
             
             % Add a title to the plot
             title(obj.mapTrajectoryAxes, 'SLAM Map and Trajectory');
+
+            % Release the hold on the current axes
+            hold(obj.mapTrajectoryAxes, 'off');
+
             drawnow;
         end
     end

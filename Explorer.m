@@ -12,12 +12,10 @@ classdef Explorer < handle
         explorationTimer % Timer for asynchronous exploration
         isExploring      % Boolean flag to check if exploration is active
         connection % Connection to Coppelia
-        MapOccupancy    % UIAxes for displaying the occupancy map
-
     end
     
     methods
-        function obj = Explorer(connection,baseControl, slamHandler, sensor, robotPose,mapOccupancy)
+        function obj = Explorer(connection,baseControl, slamHandler, sensor, robotPose)
             obj.connection = connection;
             obj.baseControl = baseControl;  % Instance of BaseControl class for movement
             obj.slamHandler = slamHandler;  % Instance of SLAMHandler class for map updates
@@ -29,7 +27,6 @@ classdef Explorer < handle
             obj.controller.LookaheadDistance = 0.5;  % Adjust this value as needed
             obj.controller.DesiredLinearVelocity = 0.3;  % Adjust for desired speed
             obj.controller.MaxAngularVelocity = 1.0;  % Maximum rotation speed
-            obj.MapOccupancy = mapOccupancy;
 
             % Initialize exploration flag
             obj.isExploring = false;
@@ -179,7 +176,7 @@ classdef Explorer < handle
                 disp('Path could not be found.');
                 return;
             end
-            show(obj.planner);
+            
 
             % Follow the path using Pure Pursuit
             obj.followPathWithPurePursuit(path);
@@ -214,7 +211,7 @@ classdef Explorer < handle
                 obj.baseControl.moveRobot(obj.connection,v, omega);  % Move the robot based on Pure Pursuit output
                 
                 % Update robot's position and the map (this ensures SLAM is being updated)
-                obj.slamHandler.updateSLAM();
+                obj.slamHandler.updateSLAM(path);
                 
                 % Check if the robot has reached the goal
                 if norm(obj.robotPosition(1:2) - path(end, :)) < obj.controller.LookaheadDistance
@@ -228,11 +225,14 @@ classdef Explorer < handle
         function exploreAsync(obj)
             % Asynchronous exploration loop, triggered by the timer
             if obj.isExploring
-                occMap = obj.slamHandler.occupancyMap;
+                occMap = obj.slamHandler.occupancyMapObject;
                 inflateRadious = 0.1;
                 inflate(occMap,inflateRadious);
                 % Initialize the path planner based on user input
+
+                disp(occMap);
                 obj.planner = plannerAStarGrid(occMap);
+
                 % Detect frontiers and set the list of frontiers
                 obj.largestFrontier = obj.findLargestFrontier(occMap);
                 
