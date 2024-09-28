@@ -166,10 +166,15 @@ classdef Explorer < handle
             
             % Perform path planning using the initialized planner
             path = plan(obj.planner, [currentRobotPosition(1),currentRobotPosition(2)], obj.goalPosition,'world');
-            
+
+   
+            % Adjust the path by subtracting the initial position
+            adjustedPath = path - [currentRobotPosition(1),currentRobotPosition(2)];
+
+
             disp('path');
 
-            disp(path);
+            disp(adjustedPath);
             
             % Check if the path is valid
             if isempty(path)
@@ -179,7 +184,7 @@ classdef Explorer < handle
             
 
             % Follow the path using Pure Pursuit
-            obj.followPathWithPurePursuit(path);
+            obj.followPathWithPurePursuit(adjustedPath);
         end
 
 
