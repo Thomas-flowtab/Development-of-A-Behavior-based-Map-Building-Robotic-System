@@ -72,9 +72,9 @@ classdef LaserScanner < handle
                     numRanges = (length(unpackedData) - 3) / 2;  % Subtract 3 for robot pose
                     
                     % Extract ranges and angles using vectorized indexing
-                    ranges = unpackedData(1:2:(2*numRanges-1));  % Range values
-                    angles = unpackedData(2:2:(2*numRanges));    % Angle values
-                    
+                    ranges = double(unpackedData(1:2:(2*numRanges-1)));  % Convert to double
+                    angles = double(unpackedData(2:2:(2*numRanges)));    % Convert to double
+
                     % Extract the robot's current pose
                     [robotX, robotY, robotBeta] = obj.extractRobotPosition(unpackedData);
                     currentPose = [robotX, robotY, robotBeta];

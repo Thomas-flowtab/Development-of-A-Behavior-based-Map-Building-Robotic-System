@@ -52,7 +52,7 @@ classdef SLAMHandler < handle
             obj.mapTrajectoryAxes = mapTrajectoryAxes; % Assign the UIAxes for SLAM map
             obj.mapOccupancyAxes = mapOccupancyAxes;   % Assign the UIAxes for occupancy map
             obj.laserScanner = laserScanner;
-            obj.occupancyMapObject = occupancyMap(10, 10, mapResolution);  % Example dimensions; adjust as needed
+            obj.occupancyMapObject = occupancyMap(420, 420, mapResolution);  % Example dimensions; adjust as needed
             
             
             % Initialize timer for periodic updates
@@ -115,13 +115,14 @@ classdef SLAMHandler < handle
             
         end
        
-        function obj = updateOccupancyMap(obj,path)
+        function occMap = updateOccupancyMap(obj,path)
             % Create the occupancy map from the SLAM data
             [scans, optimizedPoses] = scansAndPoses(obj.lidarSlam);
             map = buildMap(scans, optimizedPoses, obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
 
             % Store the updated occupancy map
-            obj.occupancyMapObject = occupancyMap(map, obj.lidarSlam.MapResolution);
+            occMap = occupancyMap(map, obj.lidarSlam.MapResolution);
+            obj.occupancyMapObject = occMap;
 
             % Plot the occupancy map on MapOccupancy UIAxes
             axes(obj.mapOccupancyAxes); % Set MapOccupancy as the current axes

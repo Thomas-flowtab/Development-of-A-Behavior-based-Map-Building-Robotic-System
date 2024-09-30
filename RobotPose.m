@@ -1,87 +1,58 @@
 classdef RobotPose < handle
-    % RobotPose Class to manage and log the robot's pose in a simulation.
-    %
-    % This class maintains the current pose of the robot, provides methods to update
-    % and retrieve the pose, and logs all pose updates over time for tracking or analysis purposes.
-    
     properties
-        pose          % Current robot pose represented as a 1x3 vector [x, y, beta]
+        pose          % Current robot pose represented as a 1x3 vector [x, y, theta]
         loggedPoses   % Nx3 array storing all logged poses over time
+        sim           % Simulation API object
+        clientID      % Client ID for the connection
+        robotHandle   % Handle to the robot object in CoppeliaSim
     end
     
     methods
-        function obj = RobotPose()
+        function obj = RobotPose(sim, clientID, robotHandle)
             % Constructor for the RobotPose class.
-            %
-            % Initializes the robot's pose and sets up the logging mechanism.
+            % Initialize the robot's pose and set up logging.
+            obj.sim = sim;                 % Assign the remote API instance
+            obj.clientID = clientID;       % Assign the client ID for communication
+            obj.robotHandle = robotHandle; % Assign the robot handle
+
             obj.loggedPoses = [];  % Initialize logged poses as an empty array
         end
         
-        function setPose(obj, newPose)
-            % Updates the robot's current pose and logs the new pose.
-            %
-            % Parameters:
-            %   newPose - 1x3 vector representing the new pose [x, y, beta]
-            %
-            % This method updates the `pose` property with `newPose` and appends the
-            % new pose to the `loggedPoses` array for historical tracking.
+        % Method to retrieve the robot's pose (position and orientation) from CoppeliaSim
+        function getRobotPose(obj)
+            % Retrieve the robot's position (x, y, z) from CoppeliaSim
+            [resPos, position] = obj.sim.simxGetObjectPosition(obj.clientID, obj.robotHandle, -1, obj.sim.simx_opmode_blocking);
+            % Retrieve the robot's orientation (yaw, pitch, roll) from CoppeliaSim
+            [resOrient, orientation] = obj.sim.simxGetObjectOrientation(obj.clientID, obj.robotHandle, -1, obj.sim.simx_opmode_blocking);
             
-            % Validate the newPose input
-            if isempty(newPose) || length(newPose) ~= 3
-                error('newPose must be a 1x3 vector [x, y, beta].');
+            % If both position and orientation retrievals were successful, update the pose
+            if resPos == obj.sim.simx_return_ok && resOrient == obj.sim.simx_return_ok
+                % Store the robot's current pose as [x, y, theta]
+                obj.pose = [position(1), position(2), orientation(3)];  % x, y, theta (z-axis rotation)
+                disp('Robot Pose (x, y, theta):');
+                disp(obj.pose);  % Print the pose for debugging
+            else
+                % If retrieval failed, display an error message
+                disp('Failed to retrieve robot pose from simulation.');
+                disp(['Position return code: ', num2str(resPos)]);       % Debug: position return code
+                disp(['Orientation return code: ', num2str(resOrient)]); % Debug: orientation return code
             end
-            
-            obj.pose = newPose;  % Update the current pose
-            obj.loggedPoses = [obj.loggedPoses; newPose];  % Log the new pose
         end
         
+        % Method to return the current pose of the robot
         function pose = getPose(obj)
-            % Retrieves the current pose of the robot.
-            %
-            % Returns:
-            %   pose - 1x3 vector representing the current pose [x, y, beta]
-            % [matlabX, matlabY, matlabTheta]  = obj.transformPose(obj.pose);
-            % pose = [matlabX, matlabY, matlabTheta];
-            pose = obj.pose;
+            pose = obj.pose;  % Return the stored pose
         end
         
+        % Method to set a new pose and log it
+        function setPose(obj, newPose)
+            obj.pose = newPose;                           % Update the current pose
+            obj.loggedPoses = [obj.loggedPoses; newPose]; % Log the new pose
+        end
+        
+        % Method to return all logged poses
         function poses = getLoggedPoses(obj)
-            % Retrieves all logged poses of the robot.
-            %
-            % Returns:
-            %   poses - Nx3 array where each row represents a logged pose [x, y, beta]
-            
-            poses = obj.loggedPoses;
+            poses = obj.loggedPoses;  % Return the logged poses
         end
-
-        function [matlabX, matlabY, matlabTheta] = transformPose(~,coppeliaPose)
-                        
-            % Extract CoppeliaSim pose
-            coppeliaX = coppeliaPose(1);
-            coppeliaY = coppeliaPose(2);
-            coppeliaTheta = coppeliaPose(3);  % Assuming theta is in radians
-            
-            % Define rotation angle between CoppeliaSim and MATLAB
-            % Example: 90 degrees rotation if CoppeliaSim's X maps to MATLAB's Y
-            rotationAngle = pi/3;  % 90 degrees in radians
-            
-            % Create rotation matrix
-            R = [cos(rotationAngle), -sin(rotationAngle);
-                 sin(rotationAngle),  cos(rotationAngle)];
-            
-            % Apply rotation to position
-            rotatedPos = R * [coppeliaX; coppeliaY];
-            
-            % Assign to MATLAB coordinates
-            matlabX = rotatedPos(1);
-            matlabY = rotatedPos(2);
-            
-            % Adjust orientation
-            matlabTheta = coppeliaTheta + rotationAngle;
-            
-            % Normalize theta to [0, 2*pi)
-            matlabTheta = mod(matlabTheta, 3*pi);
-        end
-
     end
 end
