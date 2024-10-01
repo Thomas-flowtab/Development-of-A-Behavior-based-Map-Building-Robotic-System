@@ -42,7 +42,7 @@ classdef LaserScanner < handle
             end
         end
 
-        function [cartesianData, currentPose] = getScannerData(obj)
+        function [cartesianData, currentPose,ranges,angles] = getScannerData(obj)
             % Retrieves the latest laser scan data and the current robot pose.
             %
             % Returns:
@@ -52,6 +52,8 @@ classdef LaserScanner < handle
             try 
                 cartesianData = [];
                 currentPose = [];
+                ranges=[];
+                angles=[];
                 
                 % Retrieve the latest packed laser data signal from the simulation buffer
                 [res, data] = obj.sim.simxGetStringSignal(obj.clientID, ...
@@ -79,6 +81,7 @@ classdef LaserScanner < handle
                     [robotX, robotY, robotBeta] = obj.extractRobotPosition(unpackedData);
                     currentPose = [robotX, robotY, robotBeta];
                     
+
                     % Convert polar coordinates (range, angle) to Cartesian coordinates (x, y)
                     x_cartesian = ranges .* cos(angles);
                     y_cartesian = ranges .* sin(angles);

@@ -52,7 +52,7 @@ classdef SLAMHandler < handle
             obj.mapTrajectoryAxes = mapTrajectoryAxes; % Assign the UIAxes for SLAM map
             obj.mapOccupancyAxes = mapOccupancyAxes;   % Assign the UIAxes for occupancy map
             obj.laserScanner = laserScanner;
-            obj.occupancyMapObject = occupancyMap(420, 420, mapResolution);  % Example dimensions; adjust as needed
+            
             
             
             % Initialize timer for periodic updates
@@ -78,7 +78,7 @@ classdef SLAMHandler < handle
             end
         end
 
-        function map = updateSLAM(obj,path)
+        function updateSLAM(obj,path)
             % updateSLAM Retrieves new laser data, updates SLAM, and updates maps.
             %
             % This method is called periodically by the slamTimer. It retrieves the latest
@@ -102,11 +102,11 @@ classdef SLAMHandler < handle
                     addScan(obj.lidarSlam, lidarScanObject, currentPose);
                     
                     % Update the trajectory map
-                    obj.updateTrajectoryMap(path);
+                    % obj.updateTrajectoryMap(path);
 
                     
                     % Update occupancy map
-                    map = obj.updateOccupancyMap(path);  
+                    % map = obj.updateOccupancyMap(path);  
                                         
                     % Update occupancy map based loggs
                 else

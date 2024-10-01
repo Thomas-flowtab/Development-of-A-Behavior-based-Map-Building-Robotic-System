@@ -49,22 +49,50 @@ classdef BaseControl
         end
 
 
-        function moveRobot(obj, v, omega)
+       function moveRobot(obj, v, omega)
             % Define the parameters of the Pioneer P3-DX robot
             r = 0.0975;  % Radius of the wheels (in meters)
             L = 0.331;   % Distance between the wheels (wheelbase in meters)
         
             % Introduce a speed reduction factor (between 0 and 1)
-            speedReductionFactor = 0.6;  % Reduce speed by x %, 
-
+            speedReductionFactor = 0.4;  % Reduce speed by x %, 
+        
             % Apply the reduction factor to both linear and angular velocities
             v = v * speedReductionFactor;
             omega = omega * speedReductionFactor;
-            
+        
+            % Stuck detection variables (persistent to maintain state across function calls)
+            persistent stuckTime lastV
+            if isempty(stuckTime)
+                stuckTime = 0;
+                lastV = v;  % Initialize the lastV value
+            end
+        
+            % Stuck detection parameters
+            stuckThreshold = 0.01;  % Minimum velocity threshold to consider as stuck
+            stuckDuration = 2;  % Time to consider robot stuck in seconds
+        
+            % Check if the robot is stuck
+            if abs(v) < stuckThreshold && abs(lastV) > stuckThreshold
+                % Robot is stuck (low velocity despite higher commands)
+                stuckTime = stuckTime + 0.1;  % Increment stuck time by the control loop interval (0.1 seconds)
+            else
+                stuckTime = 0;  % Reset stuck time if the robot is moving
+            end
+            lastV = v;  % Update lastV
+        
+            % If the robot is stuck, command it to move backward for a short period
+            if stuckTime > stuckDuration
+                disp('Robot is stuck, moving backward.');
+                v = -0.2;  % Reverse linear velocity (adjust this value as needed)
+                omega = 0;  % No turning while reversing
+                stuckTime = 0;  % Reset stuck time after reversing
+            end
+        
             % Compute the wheel velocities
             vLeft = v - (omega * L / 2);
             vRight = v + (omega * L / 2);
-            
+        
             % Convert wheel linear velocities to angular velocities
             omegaLeft = vLeft / r;
             omegaRight = vRight / r;
@@ -72,6 +100,7 @@ classdef BaseControl
             % Send the computed wheel velocities to the Pioneer P3-DX robot
             obj.setWheelVelocities(omegaLeft, omegaRight);
         end
+
 
 
         % Method to set velocities for all wheels

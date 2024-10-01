@@ -74,21 +74,21 @@ classdef Explorer < handle
         
                 obj.planner = plannerAStarGrid(occMap);
                 
-                obj.largestFrontier = obj.findLargestFrontier(occMap);
-                
-                if isempty(obj.largestFrontier)
-                    disp('Exploration complete. No more frontiers found.');
-                    obj.stopExploration();
-                    return;
-                end
-        
-                % Validate that the largest frontier is in a free space
-                occStatus = getOccupancy(occMap, obj.largestFrontier);
-                if occStatus > occMap.FreeThreshold
-                    disp('Selected frontier is occupied. Searching for another...');
-                    % Re-select another frontier or handle the situation accordingly
-                    return;
-                end
+                % obj.largestFrontier = obj.findLargestFrontier(occMap);
+                % 
+                % if isempty(obj.largestFrontier)
+                %     disp('Exploration complete. No more frontiers found.');
+                %     obj.stopExploration();
+                %     return;
+                % end
+                % 
+                % % Validate that the largest frontier is in a free space
+                % occStatus = getOccupancy(occMap, obj.largestFrontier);
+                % if occStatus > occMap.FreeThreshold
+                %     disp('Selected frontier is occupied. Searching for another...');
+                %     % Re-select another frontier or handle the situation accordingly
+                %     return;
+                % end
         
                 disp('Move to the selected frontier');
                 obj.createPathPlanningToFrontier();
@@ -159,27 +159,29 @@ classdef Explorer < handle
 
         
         function createPathPlanningToFrontier(obj)
-            disp(obj.largestFrontier);
-            disp('here we go');
-        
+            % disp(obj.largestFrontier);
+            % disp('here we go');
+            % 
             currentRobotPosition = obj.robotPose.getPose();
-
-
-            % Select the goal position from the largest frontier
-            obj.goalPosition = [currentRobotPosition(1), currentRobotPosition(2)] - [obj.largestFrontier(1), obj.largestFrontier(2)];
-            disp(obj.goalPosition);
-        
-            if isempty(obj.goalPosition)
-                disp('No goal position available');
-                return;
-            end
+            % 
+            % 
+            % % Select the goal position from the largest frontier
+            % obj.goalPosition = [currentRobotPosition(1), currentRobotPosition(2)] - [obj.largestFrontier(1), obj.largestFrontier(2)];
+            % disp(obj.goalPosition);
+            % 
+            % if isempty(obj.goalPosition)
+            %     disp('No goal position available');
+            %     return;
+            % end
+            obj.goalPosition = [-4.75, -0.950];
+            currPose = obj.goalPosition- [currentRobotPosition(1), currentRobotPosition(2)];
             
             % Perform path planning using the initialized planner
-            path = plan(obj.planner, [currentRobotPosition(1), currentRobotPosition(2)], obj.goalPosition, 'world');
+            path = plan(obj.planner, currPose , obj.goalPosition, 'world');
         
             adjustedPath = path - [currentRobotPosition(1), currentRobotPosition(2)];
    
-            show(obj.planner);
+
             %  Validate waypoints before moving
             % for i = 1:size(path, 1)
             %     occStatus = getOccupancy(obj.slamHandler.occupancyMapObject, path(i, :));
