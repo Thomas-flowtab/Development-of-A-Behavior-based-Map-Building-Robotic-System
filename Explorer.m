@@ -49,7 +49,7 @@ classdef Explorer < handle
             % Start the asynchronous exploration process using the timer
             if ~obj.isExploring
                 obj.isExploring = true;
-                start(obj.explorationTimer);
+                % start(obj.explorationTimer);
                 disp('Exploration started asynchronously');
             end
         end
@@ -58,7 +58,7 @@ classdef Explorer < handle
             % Stop the asynchronous exploration process by stopping the timer
             if obj.isExploring
                 obj.isExploring = false;
-                stop(obj.explorationTimer);
+                % stop(obj.explorationTimer);
                 obj.baseControl.stop();
                 disp('Exploration stopped');
             end
@@ -173,7 +173,7 @@ classdef Explorer < handle
             %     disp('No goal position available');
             %     return;
             % end
-            obj.goalPosition = [-4.75, -0.950];
+            obj.goalPosition = [2.175, -1.975];
             currPose = obj.goalPosition- [currentRobotPosition(1), currentRobotPosition(2)];
             
             % Perform path planning using the initialized planner

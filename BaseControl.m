@@ -49,7 +49,7 @@ classdef BaseControl
         end
 
 
-       function moveRobot(obj, v, omega)
+       function moveRobot(obj, v, omega, minFrontDist)
             % Define the parameters of the Pioneer P3-DX robot
             r = 0.0975;  % Radius of the wheels (in meters)
             L = 0.331;   % Distance between the wheels (wheelbase in meters)
@@ -69,7 +69,7 @@ classdef BaseControl
             end
         
             % Stuck detection parameters
-            stuckThreshold = 0.01;  % Minimum velocity threshold to consider as stuck
+            stuckThreshold = 0.1;  % Minimum velocity threshold to consider as stuck
             stuckDuration = 2;  % Time to consider robot stuck in seconds
         
             % Check if the robot is stuck
@@ -82,7 +82,7 @@ classdef BaseControl
             lastV = v;  % Update lastV
         
             % If the robot is stuck, command it to move backward for a short period
-            if stuckTime > stuckDuration
+            if stuckTime > stuckDuration || minFrontDist < 0.3
                 disp('Robot is stuck, moving backward.');
                 v = -0.2;  % Reverse linear velocity (adjust this value as needed)
                 omega = 0;  % No turning while reversing

@@ -15,7 +15,7 @@ classdef LaserScanner < handle
     methods
         function obj = LaserScanner(connection, robotPose)
             % Constructor for the LaserScanner class.
-            %
+            %   
             % Initializes the connection to the simulation, sets up data streaming,
             % and retrieves the initial robot position.
             %
@@ -42,7 +42,7 @@ classdef LaserScanner < handle
             end
         end
 
-        function [cartesianData, currentPose,ranges,angles] = getScannerData(obj)
+        function [cartesianData, currentPose,ranges,angles,minFrontDist] = getScannerData(obj)
             % Retrieves the latest laser scan data and the current robot pose.
             %
             % Returns:
@@ -54,7 +54,7 @@ classdef LaserScanner < handle
                 currentPose = [];
                 ranges=[];
                 angles=[];
-                
+                minFrontDist = 2;
                 % Retrieve the latest packed laser data signal from the simulation buffer
                 [res, data] = obj.sim.simxGetStringSignal(obj.clientID, ...
                     'laserData', obj.sim.simx_opmode_buffer);
@@ -81,6 +81,7 @@ classdef LaserScanner < handle
                     [robotX, robotY, robotBeta] = obj.extractRobotPosition(unpackedData);
                     currentPose = [robotX, robotY, robotBeta];
                     
+                    minFrontDist = obj.detectClosestPoints(ranges,angles);
 
                     % Convert polar coordinates (range, angle) to Cartesian coordinates (x, y)
                     x_cartesian = ranges .* cos(angles);
@@ -113,5 +114,17 @@ classdef LaserScanner < handle
             robotY = unpackedData(end-1);
             robotBeta = unpackedData(end);
         end
+
+
+        function minFrontDist = detectClosestPoints(~, ranges,angles)
+            % Extract distance data from lidarScan and detect closest points in front
+
+            % Define angle ranges for front, left, and right
+            frontIndices = angles >= deg2rad(-30) & angles <= deg2rad(30);
+
+            % Closest point in front
+            minFrontDist = min(ranges(frontIndices));
+        end
+        
     end
 end
