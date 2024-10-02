@@ -42,7 +42,7 @@ classdef LaserScanner < handle
             end
         end
 
-        function [cartesianData, currentPose,ranges,angles,minFrontDist] = getScannerData(obj)
+        function [cartesianData, currentPose,ranges,angles,minFrontDist,currentPoseLidar] = getScannerData(obj)
             % Retrieves the latest laser scan data and the current robot pose.
             %
             % Returns:
@@ -52,6 +52,7 @@ classdef LaserScanner < handle
             try 
                 cartesianData = [];
                 currentPose = [];
+                currentPoseLidar = [];
                 ranges=[];
                 angles=[];
                 minFrontDist = 2;
@@ -78,9 +79,10 @@ classdef LaserScanner < handle
                     angles = double(unpackedData(2:2:(2*numRanges)));    % Convert to double
 
                     % Extract the robot's current pose
-                    [robotX, robotY, robotBeta] = obj.extractRobotPosition(unpackedData);
+                    [robotX, robotY, robotBeta, robotGamma] = obj.extractRobotPosition(unpackedData);
                     currentPose = [robotX, robotY, robotBeta];
-                    
+                    currentPoseLidar = [robotX, robotY, robotGamma];
+
                     minFrontDist = obj.detectClosestPoints(ranges,angles);
 
                     % Convert polar coordinates (range, angle) to Cartesian coordinates (x, y)
@@ -98,7 +100,7 @@ classdef LaserScanner < handle
             end
         end
 
-        function [robotX, robotY, robotBeta] = extractRobotPosition(~, unpackedData)
+        function [robotX, robotY, robotBeta,robotGamma] = extractRobotPosition(~, unpackedData)
             % Extracts the robot's pose from the unpacked laser data.
             %
             % Parameters:
@@ -110,9 +112,10 @@ classdef LaserScanner < handle
             %   robotBeta - Orientation (angle) of the robot
 
             % The last three elements of unpackedData represent the robot's pose
-            robotX = unpackedData(end-2);
-            robotY = unpackedData(end-1);
-            robotBeta = unpackedData(end);
+            robotX = unpackedData(end-3);
+            robotY = unpackedData(end-2);
+            robotBeta = unpackedData(end-1);
+            robotGamma = unpackedData(end);
         end
 
 

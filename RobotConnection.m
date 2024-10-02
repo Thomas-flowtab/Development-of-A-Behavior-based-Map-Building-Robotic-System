@@ -24,7 +24,8 @@ classdef RobotConnection < handle
             
             if obj.clientID > -1
                 disp('Connected to CoppeliaSim.');
-                success = true;
+                obj.startSimulation();
+                success = obj.isSimulationRunning;
             else
                 disp('Failed to connect to CoppeliaSim.');
                 success = false;
@@ -34,6 +35,7 @@ classdef RobotConnection < handle
         % Disconnect from CoppeliaSim
         function disconnect(obj)
             if obj.clientID > -1
+                obj.stopSimulation();
                 obj.sim.simxFinish(obj.clientID);  % Close the connection
                 disp('Disconnected from CoppeliaSim.');
                 obj.clientID = -1; % Reset client ID

@@ -87,22 +87,22 @@ classdef SLAMHandler < handle
             
             
                 % Retrieve the latest laser scan and robot pose from the LaserScanner
-                [cartesianData, currentPose] = obj.laserScanner.getScannerData();
+                [cartesianData, currentPose,ranges,angles,minFrontDist,currentPoseLidar] = obj.laserScanner.getScannerData();
                 
-                if ~isempty(cartesianData) && ~isempty(currentPose)
+                if ~isempty(cartesianData) && ~isempty(currentPoseLidar)
                     % Create a lidarScan object using Cartesian coordinates
                     lidarScanObject = lidarScan(cartesianData);
                                         
 
                     % Update the robot's current pose
-                    obj.robotPose.setPose(currentPose);  
+                    obj.robotPose.setPose(currentPoseLidar);  
                     
                     
                     % Add the scan to the SLAM object
-                    addScan(obj.lidarSlam, lidarScanObject, currentPose);
+                    addScan(obj.lidarSlam, lidarScanObject, currentPoseLidar);
                     
                     % Update the trajectory map
-                    % obj.updateTrajectoryMap(path);
+                    obj.updateTrajectoryMap(path);
 
                     
                     % Update occupancy map
