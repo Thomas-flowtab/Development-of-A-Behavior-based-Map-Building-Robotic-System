@@ -1,7 +1,6 @@
-classdef BaseControl
+classdef MovementController
     properties
         connection  % Coppeliasim connection 
-        baseHandle  % Base handle 
         wheels      % Array of Wheel objects
         linearSpeed    % Speed value for all wheels
         rotationSpeed  % 
@@ -10,12 +9,11 @@ classdef BaseControl
     
     methods
         % Constructor to initialize wheels
-        function obj = BaseControl(connection,basehandle,wheelHandles, wheelRadius)
-            obj.baseHandle = basehandle;
+        function obj = MovementController(connection,wheelHandles)
             obj.wheels = cell(1, 2);
             obj.connection = connection;
             for i = 1:length(obj.wheels)
-                obj.wheels{i} = Wheel(connection,wheelHandles(i), wheelRadius);  % Initialize each wheel with radius
+                obj.wheels{i} = Wheel(connection,wheelHandles(i));  % Initialize each wheel with radius
             end
             obj.linearSpeed = 2.0;    % Default speed
             obj.rotationSpeed = 0.7 ; % Default speed
@@ -88,6 +86,14 @@ classdef BaseControl
                 omega = 0;  % No turning while reversing
                 stuckTime = 0;  % Reset stuck time after reversing
             end
+
+            % Too close
+            if minFrontDist < 0.3
+                disp('Robot is too close, moving backward.');
+                v = -0.1;  % Reverse linear velocity (adjust this value as needed)
+                omega = 0;  % No turning while reversing
+                stuckTime = 0;  % Reset stuck time after reversing
+            end                
         
             % Compute the wheel velocities
             vLeft = v - (omega * L / 2);

@@ -13,7 +13,7 @@ classdef LaserScanner < handle
     end
 
     methods
-        function obj = LaserScanner(connection, robotPose)
+        function obj = LaserScanner(connection)
             % Constructor for the LaserScanner class.
             %   
             % Initializes the connection to the simulation, sets up data streaming,
@@ -25,7 +25,7 @@ classdef LaserScanner < handle
 
             obj.sim = connection.sim;
             obj.clientID = connection.clientID;
-            obj.robotPose = robotPose;
+            
             
             % Attempt to start streaming laser data from the simulation
             [returnCode, ~] = connection.sim.simxGetStringSignal(connection.clientID, ...
@@ -42,7 +42,7 @@ classdef LaserScanner < handle
             end
         end
 
-        function [cartesianData, currentPose,ranges,angles,minFrontDist,currentPoseLidar] = getScannerData(obj)
+        function [cartesianData,currentPose,currentPoseLidar,minFrontDist] = getScannerData(obj)
             % Retrieves the latest laser scan data and the current robot pose.
             %
             % Returns:
@@ -53,8 +53,6 @@ classdef LaserScanner < handle
                 cartesianData = [];
                 currentPose = [];
                 currentPoseLidar = [];
-                ranges=[];
-                angles=[];
                 minFrontDist = 2;
                 % Retrieve the latest packed laser data signal from the simulation buffer
                 [res, data] = obj.sim.simxGetStringSignal(obj.clientID, ...
@@ -123,7 +121,7 @@ classdef LaserScanner < handle
             % Extract distance data from lidarScan and detect closest points in front
 
             % Define angle ranges for front, left, and right
-            frontIndices = angles >= deg2rad(-30) & angles <= deg2rad(30);
+            frontIndices = angles >= deg2rad(-45) & angles <= deg2rad(45);
 
             % Closest point in front
             minFrontDist = min(ranges(frontIndices));

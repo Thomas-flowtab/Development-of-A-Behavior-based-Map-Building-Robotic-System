@@ -3,16 +3,14 @@ classdef Wheel
         connection  %connection Object Handle
         handle      % Wheel handle from CoppeliaSim
         velocity    % Velocity of the wheel
-        radius      % Radius of the wheel
     end
     
     methods
         % Constructor to initialize the wheel with a handle and radius
-        function obj = Wheel(connection,handle, radius)
-            obj.handle = handle;
-            obj.velocity = 0;  % Initial velocity is 0
-            obj.radius = radius;  % Set the wheel radius
-            obj.connection = connection;
+        function obj = Wheel(connection,handle)
+            obj.connection = connection;  % Store the connection object
+            obj.handle = handle;          % Store the wheel handle from CoppeliaSim
+            obj.velocity = 0;             % Initial velocity set to 0
         end
         
         % Method to set the wheel's velocity
