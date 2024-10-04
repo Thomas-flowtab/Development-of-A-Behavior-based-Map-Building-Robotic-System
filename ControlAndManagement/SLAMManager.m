@@ -4,9 +4,9 @@ classdef SLAMManager < handle
         slamObj               % SLAM object for handling SLAM operations
         worldMap              % Occupancy map to store the SLAM result
         minValidRange = 0.1;  % Minimum valid range for laser data
-        maxValidRange = 6;    % Maximum valid range for laser data
+        maxValidRange = 10;    % Maximum valid range for laser data
         currentPosition       % Current robot pose
-        robotStartPosition    % Robot's initial position
+        intialPosition    % Robot's initial position
         frontObstacleDistance % Distance to the closest obstacle in front
     end
     
@@ -45,8 +45,8 @@ classdef SLAMManager < handle
                 obj.frontObstacleDistance = minFrontDist;
                 
                 % Set the start position if it hasn't been initialized
-                if isempty(obj.robotStartPosition)
-                    obj.robotStartPosition = currentPose;
+                if isempty(obj.intialPosition)
+                    obj.intialPosition = currentPose;
                 end
                
             else
@@ -77,8 +77,8 @@ classdef SLAMManager < handle
                     
                     obj.frontObstacleDistance = minFrontDist;
                     % Set the start position if it hasn't been initialized
-                    if isempty(obj.robotStartPosition)
-                        obj.robotStartPosition = currentPose;
+                    if isempty(obj.intialPosition)
+                        obj.intialPosition = currentPose;
                     end
                     obj.currentPosition = currentPoseLidar;
 

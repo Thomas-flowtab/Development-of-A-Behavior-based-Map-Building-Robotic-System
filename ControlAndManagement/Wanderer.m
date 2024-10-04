@@ -39,7 +39,7 @@ classdef Wanderer < handle
             robotX = currentPositionOfTheRobot(1);
             robotY = currentPositionOfTheRobot(2);
 
-            goalPosition = [robotX, robotY] + [x,y];
+            goalPosition = [robotX, robotY] - [x,y];
             disp('ai got one');
             disp(goalPosition);
 
@@ -53,7 +53,10 @@ classdef Wanderer < handle
                 startPosition = [robotX, robotY];
 
                 pathPlanner = plannerAStarGrid(inflatedMap);
+                
+                
                 % goalPosition = [-1.9150, -1.975];
+                % startPosition = [-0.09447, -3.700];
 
                 isStartValid = checkOccupancy(inflatedMap,startPosition) < 0.5;
                 isGoalValid = checkOccupancy(inflatedMap,goalPosition) < 0.5;
