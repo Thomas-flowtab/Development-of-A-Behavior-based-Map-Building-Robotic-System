@@ -15,7 +15,7 @@ classdef MovementController
             for i = 1:length(obj.wheels)
                 obj.wheels{i} = Wheel(connection,wheelHandles(i));  % Initialize each wheel with radius
             end
-            obj.linearSpeed = 2.0;    % Default speed
+            obj.linearSpeed = 1.8;    % Default speed
             obj.rotationSpeed = 0.7 ; % Default speed
             obj.WheelMovements = struct(...
                 'FORWARD', 1, 'BACKWARD', 2, 'LEFT', 3, 'RIGHT', 4, 'STOP', 5, 'CLOCKWISE', 6, 'COUNTER_CLOCKWISE', 7);

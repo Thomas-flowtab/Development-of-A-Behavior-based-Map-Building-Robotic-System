@@ -1,4 +1,4 @@
-classdef LaserScanner < handle
+classdef LidarScanner < handle
     % LaserScanner Class to interface with a laser scanner in a simulation environment.
     %
     % This class handles the connection to the laser scanner, streaming of laser data,
@@ -13,7 +13,7 @@ classdef LaserScanner < handle
     end
 
     methods
-        function obj = LaserScanner(connection)
+        function obj = LidarScanner(connection)
             % Constructor for the LaserScanner class.
             %   
             % Initializes the connection to the simulation, sets up data streaming,
@@ -90,7 +90,7 @@ classdef LaserScanner < handle
                     % Combine x and y coordinates into an Nx2 matrix
                     cartesianData = [x_cartesian', y_cartesian'];
                 else
-                    disp('Failed to retrieve laser data from the simulation.');
+                    disp(['Failed to retrieve laser data from the simulation.',res]);
                 end
             catch ME
                 % Handle any errors that occur during data retrieval or processing

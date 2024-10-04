@@ -1,6 +1,6 @@
 classdef Wheel
     properties
-        connection  %connection Object Handle
+        connection  % Connection to CoppeliaSim
         handle      % Wheel handle from CoppeliaSim
         velocity    % Velocity of the wheel
     end
