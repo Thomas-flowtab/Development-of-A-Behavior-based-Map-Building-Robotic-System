@@ -7,14 +7,15 @@ classdef Wanderer < handle
         floorYMax =  0
         purePursuitController
         movementController
-
+        optimisedPath
+        plannedPath
         goalRadius = 0.1;
-        targetReached = false;
-
+        targetReached;
         frontObstacleDistance
     end
 
     methods
+
         function obj = Wanderer(movementController)
 
             obj.purePursuitController = controllerPurePursuit;
@@ -23,103 +24,29 @@ classdef Wanderer < handle
             obj.purePursuitController.MaxAngularVelocity = 0.6;  % Allow up to 2 rad/s angular velocity
             
             obj.movementController = movementController;
+            obj.targetReached = false;
 
         end
 
-        function [x, y] = findNearestFrontier(~,map,currentPositionOfTheRobot)
-                
-                % Get the occupancy grid matrix
-                occMatrix = getOccupancy(map);  % Get occupancy matrix
-                
-                % Define the unexplored threshold (typically 0.5 represents unknown)
-                unexploredValue = 0.5;
-            
-                % Get the robot's position in grid coordinates
-                robotX = currentPositionOfTheRobot(1);
-                robotY = currentPositionOfTheRobot(2);
-            
-                % Initialize the minimum distance and coordinates for closest unexplored area
-                minDist = inf;
-                x = NaN;
-                y = NaN;
-                
-                % Get the map size
-                [mapHeight, mapWidth] = size(occMatrix);
-            
-                % Loop through the grid cells of the occupancy matrix
-                for i = 1:mapHeight
-                    for j = 1:mapWidth
-                        % Check if the cell is unexplored (close to 0.5)
-                        occVal = occMatrix(i,j);
-                        if abs(occVal - unexploredValue) < 0.01
-                            % Convert grid coordinates to world coordinates
-                            gridCoords = grid2world(map, [i, j]);
-                            worldX = gridCoords(1);
-                            worldY = gridCoords(2);
 
-                            % Check if the point is within the floor boundaries
-                            if worldX >= app.floorXMin && worldX <= app.floorXMax && worldY >= app.floorYMin && worldY <= app.floorYMax
-                                % Compute the Euclidean distance from the robot to the cell (i, j)
-                                dist = sqrt((i - robotX)^2 + (j - robotY)^2);
-                                
-                                % Update the minimum distance and corresponding coordinates
-                                if dist < minDist
-                                    minDist = dist;
-                                    x = round(worldX, 4);  % Extract the X coordinate
-                                    y = round(worldY, 4);  % Extract the Y coordinate
-
-                                    % Display a debug message with the coordinates and occupancy value
-                                    app.targetReached = false;
-                                end
-                            end
-                        end
-                    end
-                end
+        function obj = planRobotTrajectory(obj,worldMap,currentPositionOfTheRobot,frontObstacleDistance)
+            
+            if isempty(currentPositionOfTheRobot) || isempty(worldMap) || isempty(frontObstacleDistance)
+                return;
             end
-    
-        function executeRobotMovement(~,currentPositionOfTheRobot)
-            % Get the robot's current pose
-            robotPosition = currentPositionOfTheRobot;  % Assuming you have a method to get the current robot pose
-    
-            % Compute control inputs using the pure pursuit controller
-            [v, omega] = obj.purePursuitController(robotPosition);
-    
-            % Move the robot using the control inputs
-            app.movementController.moveRobot(v, omega,app.frontObstacleDistance);
-    
-            % Recompute the distance to the goal
-            distanceToGoal = norm(robotPosition(1:2) - app.purePursuitController.Waypoints(end, 1:2));
-    
-            % Check if the robot has reached the goal
-            if distanceToGoal <= app.goalRadius
-                app.targetReached = true;
-    
-                % Stop the robot
-                app.movementController.moveRobot(0, 0,app.frontObstacleDistance);
-    
-                % Stop the timer
-                stop(app.timerMoveTheRobot);
-            end
-        end
-
-
-        
-       
-
-        function planRobotTrajectory(obj,currentPositionOfTheRobot)
-            [x,y] = obj.findNearestFrontier();
+            [x,y] = obj.findNearestFrontier(worldMap,currentPositionOfTheRobot);
 
             robotX = currentPositionOfTheRobot(1);
             robotY = currentPositionOfTheRobot(2);
 
-            goalPosition = [robotX, robotY] - [x,y];
+            goalPosition = [robotX, robotY] + [x,y];
             disp('ai got one');
             disp(goalPosition);
 
-            if ~isempty(goalPosition) && ~app.targetReached
+            if ~isempty(goalPosition) && ~obj.targetReached
                
                 inflateRadious = 0.3;
-                inflatedMap = copy(app.worldMap);
+                inflatedMap = copy(worldMap);
                                 
                 inflate(inflatedMap , inflateRadious);
 
@@ -143,21 +70,16 @@ classdef Wanderer < handle
                         firstPath = plan(pathPlanner, startPosition , goalPosition,'world');
                         if ~isempty(firstPath)
 
-                            app.optimisedPath = optimizePath(firstPath,inflatedMap);
-                            app.plannedPath = firstPath;
-                            app.purePursuitController.Waypoints = app.plannedPath; %[app.optimisedPath(1),app.optimisedPath(2)];
-                            
-                            if strcmp(app.timerMoveTheRobot.Running, 'off')
-                                start(app.timerMoveTheRobot);
-                            end
+                            obj.optimisedPath = optimizePath(firstPath,inflatedMap);
+                            obj.plannedPath = firstPath;
+                            obj.purePursuitController.Waypoints = obj.plannedPath; %[obj.optimisedPath(1),obj.optimisedPath(2)];
                         else
                             disp('No plan was found');
-                            app.movementController.moveRobot(0, 0,app.frontObstacleDistance);
+                            obj.movementController.moveRobot(0, 0,frontObstacleDistance);
                         end
                     catch exception
                         disp(exception.message);
-                        app.movementController.moveRobot(0, 0,app.frontObstacleDistance);
-                        app.stopAllProcesses();
+                        obj.movementController.moveRobot(0, 0,frontObstacleDistance);
                     end
                 else
                     disp(isStartValid);
@@ -166,5 +88,79 @@ classdef Wanderer < handle
             end
         end
 
+        function [x, y] = findNearestFrontier(obj,map,currentPositionOfTheRobot)
+            % Get the occupancy grid matrix
+            occMatrix = getOccupancy(map);  % Get occupancy matrix
+            
+            % Define the unexplored threshold (typically 0.5 represents unknown)
+            unexploredValue = 0.5;
+        
+            % Get the robot's position in grid coordinates
+            robotX = currentPositionOfTheRobot(1);
+            robotY = currentPositionOfTheRobot(2);
+        
+            % Initialize the minimum distance and coordinates for closest unexplored area
+            minDist = inf;
+            x = NaN;
+            y = NaN;
+            
+            % Get the map size
+            [mapHeight, mapWidth] = size(occMatrix);
+        
+            % Loop through the grid cells of the occupancy matrix
+            for i = 1:mapHeight
+                for j = 1:mapWidth
+                    % Check if the cell is unexplored (close to 0.5)
+                    occVal = occMatrix(i,j);
+                    if abs(occVal - unexploredValue) < 0.01
+                        % Convert grid coordinates to world coordinates
+                        gridCoords = grid2world(map, [i, j]);
+                        worldX = gridCoords(1);
+                        worldY = gridCoords(2);
+        
+                        % Check if the point is within the floor boundaries
+                        if worldX >= obj.floorXMin && worldX <= obj.floorXMax && worldY >= obj.floorYMin && worldY <= obj.floorYMax
+                            % Compute the Euclidean distance from the robot to the cell (i, j)
+                            dist = sqrt((i - robotX)^2 + (j - robotY)^2);
+                            
+                            % Update the minimum distance and corresponding coordinates
+                            if dist < minDist
+                                minDist = dist;
+                                x = round(worldX, 4);  % Extract the X coordinate
+                                y = round(worldY, 4);  % Extract the Y coordinate
+        
+                                % Display a debug message with the coordinates and occupancy value
+                                obj.targetReached = false;
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    
+        function targetReached = executeRobotMovement(obj,currentPositionOfTheRobot,frontObstacleDistance)
+            
+            targetReached = false;
+            
+            % Get the robot's current pose
+            robotPosition = currentPositionOfTheRobot;
+    
+            % Compute control inputs using the pure pursuit controller
+            [v, omega] = obj.purePursuitController(robotPosition);
+    
+            % Move the robot using the control inputs
+            obj.movementController.moveRobot(v, omega, frontObstacleDistance);
+    
+            % Recompute the distance to the goal
+            distanceToGoal = norm(robotPosition(1:2) - obj.purePursuitController.Waypoints(end, 1:2));
+    
+            % Check if the robot has reached the goal
+            if distanceToGoal <= obj.goalRadius
+                obj.targetReached = true;
+                targetReached = obj.targetReached;
+                % Stop the robot
+                obj.movementController.moveRobot(0, 0, frontObstacleDistance);
+            end
+        end
     end
 end

@@ -8,7 +8,6 @@ classdef SLAMManager < handle
         currentPosition       % Current robot pose
         robotStartPosition    % Robot's initial position
         frontObstacleDistance % Distance to the closest obstacle in front
-        monteCarloLocalisation %
     end
     
     methods
@@ -21,11 +20,6 @@ classdef SLAMManager < handle
             
             % Initialize the laser scanner reference
             obj.lidarScanner = LidarScanner(connection);
-            
-            obj.monteCarloLocalisation = monteCarloLocalization;
-            obj.monteCarloLocalisation.UseLidarScan = true;
-            
-           
         end
 
         % Method to update the SLAM system
@@ -86,6 +80,7 @@ classdef SLAMManager < handle
                     if isempty(obj.robotStartPosition)
                         obj.robotStartPosition = currentPose;
                     end
+                    obj.currentPosition = currentPoseLidar;
 
                     % Set flag to true once data is successfully retrieved
                     dataRetrieved = true;

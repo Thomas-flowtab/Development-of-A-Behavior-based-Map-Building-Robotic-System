@@ -28,8 +28,7 @@ classdef LidarScanner < handle
             
             
             % Attempt to start streaming laser data from the simulation
-            [returnCode, ~] = connection.sim.simxGetStringSignal(connection.clientID, ...
-                'laserData', connection.sim.simx_opmode_streaming);
+            [returnCode, ~] = connection.sim.simxGetStringSignal(connection.clientID,'laserData', connection.sim.simx_opmode_streaming);
             
             % Check if streaming was successfully initialized
             if returnCode == connection.sim.simx_return_ok || ...

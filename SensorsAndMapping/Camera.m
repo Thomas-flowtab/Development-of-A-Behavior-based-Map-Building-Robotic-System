@@ -6,7 +6,7 @@ classdef Camera
         cameraAxes
         hImage 
     end
-    
+     
     methods
         % Constructor to initialize camera sensor handle and modes
         function obj = Camera(connection,camHandle,cameraAxes)
