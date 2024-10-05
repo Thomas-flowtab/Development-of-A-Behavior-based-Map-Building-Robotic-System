@@ -19,9 +19,9 @@ classdef Wanderer < handle
         function obj = Wanderer(movementController)
 
             obj.purePursuitController = controllerPurePursuit;
-            obj.purePursuitController.LookaheadDistance = 0.7;  % Look for the next waypoint 0.5 meters ahead
-            obj.purePursuitController.DesiredLinearVelocity = 0.2;  % Move at 0.3 m/s
-            obj.purePursuitController.MaxAngularVelocity = 0.6;  % Allow up to 2 rad/s angular velocity
+            obj.purePursuitController.LookaheadDistance = 0.7;  % Look for the next waypoint 0.7 meters ahead
+            obj.purePursuitController.DesiredLinearVelocity = 0.2;  % Move at 0.2 m/s
+            obj.purePursuitController.MaxAngularVelocity = 0.6;  % Allow up to 0.6 rad/s angular velocity
             
             obj.movementController = movementController;
             obj.targetReached = false;
@@ -40,12 +40,11 @@ classdef Wanderer < handle
             robotY = currentPositionOfTheRobot(2);
 
             goalPosition = [robotX, robotY] - [x,y];
-            disp('ai got one');
-            disp(goalPosition);
-
+            
+            
             if ~isempty(goalPosition) && ~obj.targetReached
                
-                inflateRadious = 0.3;
+                inflateRadious = 0.4;
                 inflatedMap = copy(worldMap);
                                 
                 inflate(inflatedMap , inflateRadious);
@@ -54,7 +53,9 @@ classdef Wanderer < handle
 
                 pathPlanner = plannerAStarGrid(inflatedMap);
                 
-                
+                disp(startPosition);
+                disp(goalPosition);
+
                 % goalPosition = [-1.9150, -1.975];
                 % startPosition = [-0.09447, -3.700];
 
@@ -62,11 +63,11 @@ classdef Wanderer < handle
                 isGoalValid = checkOccupancy(inflatedMap,goalPosition) < 0.5;
 
                 goalOccupied = getOccupancy(inflatedMap,goalPosition);
-                disp('goalOccupied');
-                disp(goalPosition);
-                disp(goalOccupied);
-                disp('startPosition');
-                disp(startPosition);
+                
+                if goalOccupied < 0.2
+                    return;
+                end 
+                
 
                 if isStartValid && isGoalValid
                     try
@@ -91,7 +92,7 @@ classdef Wanderer < handle
             end
         end
 
-        function [x, y] = findNearestFrontier(obj,map,currentPositionOfTheRobot)
+     function [x, y] = findNearestFrontier(obj, map, currentPositionOfTheRobot)
             % Get the occupancy grid matrix
             occMatrix = getOccupancy(map);  % Get occupancy matrix
             
@@ -109,37 +110,49 @@ classdef Wanderer < handle
             
             % Get the map size
             [mapHeight, mapWidth] = size(occMatrix);
+            
+            % Get world limits from the map
+            xWorldLimits = map.XWorldLimits; % X limits in world coordinates
+            yWorldLimits = map.YWorldLimits; % Y limits in world coordinates
         
             % Loop through the grid cells of the occupancy matrix
             for i = 1:mapHeight
                 for j = 1:mapWidth
                     % Check if the cell is unexplored (close to 0.5)
-                    occVal = occMatrix(i,j);
+                    occVal = occMatrix(i, j);
                     if abs(occVal - unexploredValue) < 0.01
                         % Convert grid coordinates to world coordinates
                         gridCoords = grid2world(map, [i, j]);
                         worldX = gridCoords(1);
                         worldY = gridCoords(2);
         
-                        % Check if the point is within the floor boundaries
-                        if worldX >= obj.floorXMin && worldX <= obj.floorXMax && worldY >= obj.floorYMin && worldY <= obj.floorYMax
-                            % Compute the Euclidean distance from the robot to the cell (i, j)
-                            dist = sqrt((i - robotX)^2 + (j - robotY)^2);
-                            
-                            % Update the minimum distance and corresponding coordinates
-                            if dist < minDist
-                                minDist = dist;
-                                x = round(worldX, 4);  % Extract the X coordinate
-                                y = round(worldY, 4);  % Extract the Y coordinate
+                        % Check if the world coordinates are within the X and Y limits of the occupancy map
+                        if worldX >= xWorldLimits(1) && worldX <= xWorldLimits(2) && ...
+                           worldY >= yWorldLimits(1) && worldY <= yWorldLimits(2)
+                       
+                            % Check if the point is within the floor boundaries (if needed)
+                            if worldX >= obj.floorXMin && worldX <= obj.floorXMax && ...
+                               worldY >= obj.floorYMin && worldY <= obj.floorYMax
+                               
+                                % Compute the Euclidean distance from the robot to the cell (i, j)
+                                dist = sqrt((i - robotX)^2 + (j - robotY)^2);
+                                
+                                % Update the minimum distance and corresponding coordinates
+                                if dist < minDist
+                                    minDist = dist;
+                                    x = round(worldX, 4);  % Extract the X coordinate
+                                    y = round(worldY, 4);  % Extract the Y coordinate
         
-                                % Display a debug message with the coordinates and occupancy value
-                                obj.targetReached = false;
+                                    % Display a debug message with the coordinates and occupancy value
+                                    obj.targetReached = false;
+                                end
                             end
                         end
                     end
                 end
             end
         end
+
     
         function targetReached = executeRobotMovement(obj,currentPositionOfTheRobot,frontObstacleDistance)
             
