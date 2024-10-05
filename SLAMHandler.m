@@ -115,35 +115,6 @@ classdef SLAMHandler < handle
             
         end
        
-        function occMap = updateOccupancyMap(obj,path)
-            % Create the occupancy map from the SLAM data
-            [scans, optimizedPoses] = scansAndPoses(obj.lidarSlam);
-            map = buildMap(scans, optimizedPoses, obj.lidarSlam.MapResolution, obj.lidarSlam.MaxLidarRange);
-
-            % Store the updated occupancy map
-            occMap = occupancyMap(map, obj.lidarSlam.MapResolution);
-            obj.occupancyMapObject = occMap;
-
-            % Plot the occupancy map on MapOccupancy UIAxes
-            axes(obj.mapOccupancyAxes); % Set MapOccupancy as the current axes
-            cla(obj.mapOccupancyAxes);  % Clear previous content
-            show(obj.occupancyMapObject, 'Parent', obj.mapOccupancyAxes); % Plot occupancy map
-            hold(obj.mapOccupancyAxes, 'on');
-
-            % Plot the robot's current position
-            if ~isempty(optimizedPoses)
-                plot(obj.mapOccupancyAxes, optimizedPoses(1), optimizedPoses(2), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
-            end
-
-            % Plot the path from plannerAStarGrid
-            if ~isempty(path)
-                plot(obj.mapOccupancyAxes, path(:, 1), path(:, 2), 'r-', 'LineWidth', 2);
-            end
-
-            hold(obj.mapOccupancyAxes, 'off');
-            title(obj.mapOccupancyAxes, 'Occupancy Grid Map Built Using Lidar SLAM');
-            drawnow;
-        end
 
         function updateTrajectoryMap(obj,path)
             % updateTrajectoryMap Visualizes the SLAM trajectory on the MapTrajectory UIAxes.

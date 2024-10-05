@@ -123,7 +123,7 @@ classdef LaserScanner < handle
             % Extract distance data from lidarScan and detect closest points in front
 
             % Define angle ranges for front, left, and right
-            frontIndices = angles >= deg2rad(-30) & angles <= deg2rad(30);
+            frontIndices = angles >= deg2rad(-45) & angles <= deg2rad(45);
 
             % Closest point in front
             minFrontDist = min(ranges(frontIndices));
